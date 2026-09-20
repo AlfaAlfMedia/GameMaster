@@ -1,0 +1,6 @@
+# The programs and configuration files of this project run on Linux, so every
+# text file is stored and checked out with LF line endings - also on Windows.
+* text=auto eol=lf
+
+*.png binary
+*.deb binary

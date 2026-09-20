@@ -1,0 +1,303 @@
+#!/usr/bin/python3
+"""Start a Project Zomboid server once so it creates a world, then stop it.
+
+Must be run as root.
+
+Usage:
+    zomboid_initialise_world [-u|--username USERNAME] WORLDNAME
+
+The world has to exist already and must not be initialised yet - see
+zomboid_list_worlds. The output of the server goes into a log file below
+/var/log/gamemaster; this program itself reports what it is doing in short
+lines, so that a caller can follow it.
+"""
+
+import argparse
+import os
+import shutil
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+from gamemaster import configfile, validate, zomboid
+from gamemaster.errors import GameMasterError
+
+ETC_DIR = Path("/etc/gamemaster")
+GAMEMASTER_CONF_FILE = ETC_DIR / "gamemaster.conf"
+ZOMBOID_ETC_DIR = ETC_DIR / "zomboid"
+
+LOG_DIR = Path("/var/log/gamemaster/zomboid")
+
+SERVER_SCRIPT = "start-server.sh"
+
+# How long the server may take to come up, how often it is asked, and how
+# often a line is printed while waiting
+STARTUP_TIMEOUT = 300.0
+CHECK_INTERVAL = 2.0
+WAITING_MESSAGE_INTERVAL = 15.0
+
+# How long the server may take to shut down after the quit command
+SHUTDOWN_TIMEOUT = 120.0
+
+
+def report(message: str) -> None:
+    """Print one line about what is happening, for whoever called us."""
+    print(message, flush=True)
+
+
+def check_root() -> None:
+    """End with an error if the program is not run as root."""
+    if os.geteuid() != 0:
+        raise GameMasterError(
+            "This command must be run as root (for example with sudo)."
+        )
+
+
+def read_settings(path: Path) -> dict[str, str]:
+    """Return the settings of a configuration file."""
+    try:
+        return configfile.read_values(path.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise GameMasterError(f"Could not read {path}: {error}") from error
+
+
+def get_username(given: str | None) -> str:
+    """Return the user name from the command line or from gamemaster.conf."""
+    if given is not None:
+        return validate.parse_username(given)
+
+    default = read_settings(GAMEMASTER_CONF_FILE).get("PZ_DEFAULT_USER")
+    if not default:
+        raise GameMasterError(
+            f"No user given and PZ_DEFAULT_USER is not set in "
+            f"{GAMEMASTER_CONF_FILE}. Use -u/--username to name a user."
+        )
+    return validate.parse_username(default)
+
+
+def open_log_file(username: str, worldname: str, owner: str):
+    """Create the log file for this run and return it, opened for writing."""
+    directory = LOG_DIR / username
+    log_file = directory / f"{worldname}-initialise.log"
+
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        handle = log_file.open("a", encoding="utf-8")
+        # The group of the server user may read it, nobody else
+        shutil.chown(log_file, group=owner)
+        log_file.chmod(0o640)
+    except (OSError, LookupError) as error:
+        raise GameMasterError(f"Could not write {log_file}: {error}") from error
+
+    report(f"log file: {log_file}")
+    return handle
+
+
+def start_server(
+    install_dir: Path, server_user: str, worldname: str, password: str, log
+) -> subprocess.Popen:
+    """Start the server in the background and return the running process."""
+    server_script = install_dir / SERVER_SCRIPT
+    if not server_script.is_file():
+        raise GameMasterError(
+            f"No Project Zomboid server found in {install_dir} "
+            f"({SERVER_SCRIPT} is missing)."
+        )
+
+    environment = dict(os.environ)
+    environment["HOME"] = f"/home/{server_user}"
+    environment["USER"] = server_user
+    environment["LOGNAME"] = server_user
+
+    try:
+        return subprocess.Popen(
+            [
+                str(server_script),
+                "-servername",
+                worldname,
+                "-adminpassword",
+                password,
+            ],
+            cwd=install_dir,
+            user=server_user,
+            group=server_user,
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            # Its own session, so that Ctrl+C reaches this program only and
+            # the server is stopped properly instead of being interrupted
+            start_new_session=True,
+        )
+    except (OSError, LookupError) as error:
+        raise GameMasterError(f"Could not start {server_script}: {error}") from error
+
+
+def server_answers(data_dir: Path, worldname: str) -> bool:
+    """Say whether the server is far enough along to be joined."""
+    # The database file is the cheap check: while it is missing, the world is
+    # not there yet and RCON does not need to be bothered
+    if not (data_dir / zomboid.DATABASE_SUBDIR / f"{worldname}.db").is_file():
+        return False
+
+    try:
+        with zomboid.rcon_for_world(data_dir, worldname) as server:
+            server.players()
+    except GameMasterError:
+        return False
+
+    return True
+
+
+def wait_for_server(process: subprocess.Popen, data_dir: Path, worldname: str) -> None:
+    """Wait until the server can be joined, or raise after the timeout."""
+    report("waiting for the server")
+
+    start = time.monotonic()
+    deadline = start + STARTUP_TIMEOUT
+    next_message = start + WAITING_MESSAGE_INTERVAL
+
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise GameMasterError(
+                f"The server stopped by itself (exit code {process.returncode}). "
+                "See the log file."
+            )
+        if server_answers(data_dir, worldname):
+            return
+
+        now = time.monotonic()
+        if now >= next_message:
+            report(f"still waiting ({now - start:.0f}s)")
+            next_message = now + WAITING_MESSAGE_INTERVAL
+
+        time.sleep(CHECK_INTERVAL)
+
+    raise GameMasterError(
+        f"The server was not reachable after {STARTUP_TIMEOUT:.0f} seconds. "
+        "See the log file."
+    )
+
+
+def stop_server(process: subprocess.Popen, data_dir: Path, worldname: str) -> None:
+    """Send quit over RCON and wait for the server to end."""
+    report("stopping the server")
+
+    try:
+        with zomboid.rcon_for_world(data_dir, worldname) as server:
+            server.quit_server()
+    except GameMasterError as error:
+        raise GameMasterError(f"Could not stop the server: {error}") from error
+
+    try:
+        process.wait(timeout=SHUTDOWN_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        raise GameMasterError(
+            f"The server is still running {SHUTDOWN_TIMEOUT:.0f} seconds after "
+            "the quit command. It has been left alone."
+        ) from None
+
+
+def initialise_world(given_username: str | None, given_worldname: str) -> None:
+    """Create the world by letting the server run once."""
+    check_root()
+
+    username = get_username(given_username)
+    worldname = validate.parse_worldname(given_worldname)
+
+    conf_file = ZOMBOID_ETC_DIR / f"{username}.conf"
+    if not conf_file.is_file():
+        raise GameMasterError(
+            f"No configuration found for user '{username}': {conf_file}. "
+            f"Run 'gamemaster add zomboid -u {username}' first."
+        )
+
+    settings = read_settings(conf_file)
+    source = str(conf_file)
+    data_dir = Path(configfile.require(settings, "PZ_SERVER_DATA_DIR", source))
+    server_user = validate.parse_username(
+        configfile.require(settings, "PZ_SERVER_USER", source)
+    )
+    install_dir = Path(
+        validate.parse_install_dir(
+            configfile.require(settings, "PZ_SERVER_INSTALL_DIR", source)
+        )
+    )
+    password = configfile.require(settings, "PZ_SERVER_ADMIN_PASSWORD", source)
+
+    playable, created = zomboid.find_worlds(data_dir)
+    if worldname in playable:
+        report(f"world '{worldname}' is already initialised")
+        return
+    if worldname not in created:
+        raise GameMasterError(
+            f"The world '{worldname}' cannot be initialised. "
+            "Run 'zomboid_list_worlds' to see which worlds are waiting."
+        )
+
+    log = open_log_file(username, worldname, server_user)
+
+    try:
+        process = start_server(install_dir, server_user, worldname, password, log)
+        report(f"server started as '{server_user}'")
+
+        try:
+            wait_for_server(process, data_dir, worldname)
+            report("server is up")
+        except KeyboardInterrupt:
+            report("cancelled, stopping the server")
+            stop_server(process, data_dir, worldname)
+            raise GameMasterError("Cancelled before the world was finished.") from None
+
+        stop_server(process, data_dir, worldname)
+    finally:
+        log.close()
+
+    playable, _ = zomboid.find_worlds(data_dir)
+    if worldname not in playable:
+        raise GameMasterError(
+            f"The server has stopped, but the world '{worldname}' is still not "
+            "playable. See the log file."
+        )
+
+    report(f"world '{worldname}' initialised")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Describe the command line."""
+    parser = argparse.ArgumentParser(
+        prog="zomboid_initialise_world",
+        description="Let a Project Zomboid server create a world once.",
+    )
+    parser.add_argument(
+        "worldname",
+        metavar="WORLDNAME",
+        help="name of the world to initialise",
+    )
+    parser.add_argument(
+        "-u",
+        "--username",
+        metavar="USERNAME",
+        default=None,
+        help="user whose server the world belongs to "
+             f"(default: PZ_DEFAULT_USER from {GAMEMASTER_CONF_FILE})",
+    )
+    return parser
+
+
+def main() -> int:
+    """Start of the program. Returns the exit code (0 = everything ok)."""
+    arguments = build_parser().parse_args()
+
+    try:
+        initialise_world(arguments.username, arguments.worldname)
+    except GameMasterError as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
