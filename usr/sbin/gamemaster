@@ -1,0 +1,290 @@
+#!/usr/bin/python3
+"""gamemaster - administration tool for GameMaster. Must be run as root.
+
+Usage:
+    gamemaster add zomboid [-u|--username USERNAME] [-d|--installdir DIRECTORY]
+    gamemaster -h | --help
+
+"add zomboid" registers an EXISTING Project Zomboid server with
+GameMaster. It does not create the Linux user and it does not install
+the server. It only writes the file /etc/gamemaster/zomboid/USERNAME.conf.
+
+Both options may be given in any order. If -u is left out, the user
+PZ_DEFAULT_USER from /etc/gamemaster/gamemaster.conf is used.
+"""
+
+import argparse
+import os
+import pwd
+import re
+import sys
+from pathlib import Path
+
+# ---------------------------------------------------------------------------
+# Constants (written in capital letters, as PEP 8 asks)
+# ---------------------------------------------------------------------------
+ETC_DIR = Path("/etc/gamemaster")
+ZOMBOID_ETC_DIR = ETC_DIR / "zomboid"
+
+# Settings an administrator may change, among them PZ_DEFAULT_USER
+GAMEMASTER_CONF_FILE = ETC_DIR / "gamemaster.conf"
+
+# Install directory that is used when -d is not given
+ZOMBOID_DEFAULT_INSTALL_DIR = "/opt/pzserver"
+ZOMBOID_TEMPLATE_FILE = Path("/usr/share/gamemaster/zomboid/template.conf")
+
+# A Linux user name starts with a lowercase letter or _ and continues with
+# lowercase letters, digits, _ or -. At most 32 characters.
+USERNAME_PATTERN = re.compile(r"[a-z_][a-z0-9_-]{0,31}")
+
+# Only an absolute path made of letters, digits, dot, underscore, hyphen
+# and slash is allowed. The path is written into a file that bash reads
+# later, so spaces, quotes, $ and similar characters must not get in.
+INSTALL_DIR_PATTERN = re.compile(r"/[A-Za-z0-9._/-]+")
+
+
+class GameMasterError(Exception):
+    """An error that is shown to the user as a message.
+
+    It is raised ("thrown") wherever something is wrong and caught
+    ("catch") once in main(), which prints the message and ends the
+    program.
+    """
+
+
+def read_conf_value(conf_file: Path, key: str) -> str | None:
+    """Return the value of one KEY=VALUE setting, or None if it is missing.
+
+    The configuration files are read by bash as well, so the format is
+    the one bash uses: empty lines and lines starting with # are
+    ignored, and quotes around the value do not belong to it.
+    """
+    try:
+        text = conf_file.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    value = None
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        # partition splits at the FIRST "=", so a value may contain "="
+        name, separator, rest = line.partition("=")
+        if separator and name.strip() == key:
+            # A later line overwrites an earlier one, as it does in bash
+            value = rest.strip().strip('"').strip("'")
+
+    # An empty value counts as "not set"
+    return value or None
+
+
+def get_default_username() -> str:
+    """Return PZ_DEFAULT_USER from /etc/gamemaster/gamemaster.conf."""
+    username = read_conf_value(GAMEMASTER_CONF_FILE, "PZ_DEFAULT_USER")
+    if username is None:
+        raise GameMasterError(
+            f"No user given and PZ_DEFAULT_USER is not set in "
+            f"{GAMEMASTER_CONF_FILE}. Use -u/--username to name a user."
+        )
+    return username
+
+
+def check_root() -> None:
+    """End with an error if the program is not run as root."""
+    # The effective user ID of root is 0
+    if os.geteuid() != 0:
+        raise GameMasterError(
+            "This command must be run as root (for example with sudo)."
+        )
+
+
+def check_username(username: str) -> None:
+    """Check that the name is a valid, existing Linux user."""
+    # This is checked FIRST, because the name becomes part of a file name.
+    # fullmatch means: the WHOLE text must fit the pattern.
+    if not USERNAME_PATTERN.fullmatch(username):
+        raise GameMasterError(
+            f"'{username}' is not a valid user name (lowercase letters, "
+            "digits, _ and -, at most 32 characters)."
+        )
+
+    # Ask the system for the user. If there is none, Python raises a
+    # KeyError, which is turned into our own error message.
+    try:
+        pwd.getpwnam(username)
+    except KeyError:
+        raise GameMasterError(
+            f"The Linux user '{username}' does not exist."
+        ) from None
+
+
+def check_install_dir(install_dir: str) -> None:
+    """Check that the path is safe and contains a Zomboid server."""
+    if not INSTALL_DIR_PATTERN.fullmatch(install_dir):
+        raise GameMasterError(
+            f"Install directory '{install_dir}' is not allowed: use an "
+            "absolute path (starting with /) with only letters, digits, "
+            ". _ - and /"
+        )
+    if ".." in install_dir:
+        raise GameMasterError(
+            f"Install directory '{install_dir}' is not allowed: "
+            "'..' is not permitted."
+        )
+
+    # start-server.sh proves that a server is really installed there
+    if not (Path(install_dir) / "start-server.sh").is_file():
+        raise GameMasterError(
+            f"No Project Zomboid server found in {install_dir} "
+            "(start-server.sh is missing)."
+        )
+
+
+def write_zomboid_config(username: str, install_dir: str) -> None:
+    """Create /etc/gamemaster/zomboid/USERNAME.conf from the template.
+
+    The template /usr/share/gamemaster/zomboid/template.conf is copied and
+    the value of PZ_SERVER_INSTALL_DIR and PZ_SERVER_USER is changed to given values.
+    """
+    conf_file = ZOMBOID_ETC_DIR / f"{username}.conf"
+
+    # Read the template that ships with the program
+    try:
+        template = ZOMBOID_TEMPLATE_FILE.read_text(encoding="utf-8")
+    except OSError as error:
+        raise GameMasterError(
+            f"Could not read the template {ZOMBOID_TEMPLATE_FILE}: {error}"
+        ) from error
+
+    # Copy the template line by line, set only the install directory and user
+    result = []
+    for line in template.splitlines(keepends=True):
+        if line.lstrip().startswith("PZ_SERVER_INSTALL_DIR="):
+            result.append(f"PZ_SERVER_INSTALL_DIR={install_dir}\n")
+        elif line.lstrip().startswith("PZ_SERVER_USER="):
+            result.append(f"PZ_SERVER_USER={username}\n")
+        else:
+            result.append(line)
+    content = "".join(result)
+
+    # Create the directory if it does not exist yet
+    try:
+        ZOMBOID_ETC_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        raise GameMasterError(
+            f"Could not create {ZOMBOID_ETC_DIR}: {error}"
+        ) from error
+
+    # Mode "x" means: create the file, and fail if it already exists.
+    # An existing file is therefore never overwritten.
+    try:
+        with open(conf_file, "x", encoding="utf-8") as file:
+            file.write(content)
+    except FileExistsError:
+        raise GameMasterError(
+            f"{conf_file} already exists. "
+            f"The user '{username}' is already registered."
+        ) from None
+    except OSError as error:
+        raise GameMasterError(
+            f"Could not write {conf_file}: {error}"
+        ) from error
+
+    # The file contains no secrets: everybody may read it, only root may
+    # change it (0o644 is the permission number in octal notation)
+    try:
+        conf_file.chmod(0o644)
+    except OSError as error:
+        raise GameMasterError(
+            f"Could not set the permissions of {conf_file}: {error}"
+        ) from error
+
+    print(f"Registered the Zomboid server of user '{username}'.")
+    print(f"Configuration file: {conf_file}")
+
+
+def add_zomboid(username: str | None, install_dir: str) -> None:
+    """gamemaster add zomboid [-u USERNAME] [-d DIRECTORY]"""
+    # Without -u the default user from gamemaster.conf is used
+    if username is None:
+        username = get_default_username()
+
+    # Remove slashes at the end: "/opt/pzserver/" and "/opt/pzserver"
+    # are the same directory
+    install_dir = install_dir.rstrip("/")
+
+    check_username(username)
+    check_install_dir(install_dir)
+    write_zomboid_config(username, install_dir)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Describe the command line: commands, games, options.
+
+    argparse reads the words of the command line, checks them against
+    this description, and creates the help text (-h) and the error
+    messages for unknown words by itself.
+    """
+    parser = argparse.ArgumentParser(
+        prog="gamemaster",
+        description="Administration tool for GameMaster.",
+    )
+    commands = parser.add_subparsers(
+        dest="command", required=True, metavar="COMMAND"
+    )
+
+    # gamemaster add ...
+    add_parser = commands.add_parser(
+        "add", help="register an existing game server"
+    )
+    games = add_parser.add_subparsers(
+        dest="game", required=True, metavar="GAME"
+    )
+
+    # gamemaster add zomboid [-u USERNAME] [-d DIRECTORY]
+    # Both are options, not positional words, so their order is free.
+    zomboid = games.add_parser(
+        "zomboid", help="register a Project Zomboid server"
+    )
+    zomboid.add_argument(
+        "-u",
+        "--username",
+        metavar="USERNAME",
+        default=None,
+        help="existing Linux user that runs the server "
+             "(default: PZ_DEFAULT_USER from "
+             f"{GAMEMASTER_CONF_FILE})",
+    )
+    zomboid.add_argument(
+        "-d",
+        "--installdir",
+        metavar="DIRECTORY",
+        default=ZOMBOID_DEFAULT_INSTALL_DIR,
+        help=f"directory of the server (default: "
+             f"{ZOMBOID_DEFAULT_INSTALL_DIR})",
+    )
+
+    return parser
+
+
+def main() -> int:
+    """Start of the program. Returns the exit code (0 = everything ok)."""
+    args = build_parser().parse_args()
+
+    try:
+        if args.command == "add":
+            check_root()
+            if args.game == "zomboid":
+                add_zomboid(args.username, args.installdir)
+    except GameMasterError as error:
+        # Error messages go to STDERR, so they are not mixed up with the
+        # normal output
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
