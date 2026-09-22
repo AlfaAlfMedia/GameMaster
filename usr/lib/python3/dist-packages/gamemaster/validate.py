@@ -29,6 +29,10 @@ INSTALL_DIR_RULE = (
     "and slash"
 )
 
+# Name of a Steam branch, as SteamCMD expects it after -beta
+BRANCH_PATTERN = re.compile(r"[A-Za-z0-9._-]{1,64}")
+BRANCH_RULE = "letters, digits, dot, underscore and hyphen, at most 64 characters"
+
 # Ports below 1024 may only be opened by root, and the game servers run as
 # their own user
 MINIMUM_PORT = 1024
@@ -71,6 +75,13 @@ def parse_port(text: str, name: str = "port") -> int:
     return port
 
 
+def parse_app_id(text: str) -> str:
+    """Return the Steam application ID, which consists of digits only."""
+    if not text.isdigit():
+        raise ValidationError(f"{text!r} is not a Steam application ID (digits only).")
+    return text
+
+
 def parse_steam_id(text: str) -> str:
     """Return the Steam ID, which consists of digits only."""
     if not text.isdigit():
@@ -92,3 +103,8 @@ def parse_install_dir(text: str) -> str:
     if ".." in directory:
         raise ValidationError(f"{text!r} is not allowed: '..' is not permitted.")
     return directory
+
+
+def parse_branch(text: str) -> str:
+    """Return the name of a Steam branch."""
+    return _checked(text, BRANCH_PATTERN, BRANCH_RULE)
