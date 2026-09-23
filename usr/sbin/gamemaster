@@ -25,6 +25,7 @@ program then offers the next free one.
 
 import argparse
 import getpass
+import grp
 import pwd
 import shutil
 import subprocess
@@ -113,6 +114,21 @@ def get_default_install_dir(template: str) -> str:
         "PZ_SERVER_INSTALL_DIR",
         str(ZOMBOID_TEMPLATE_FILE),
     )
+
+
+def add_user_to_group(username: str, group: str) -> None:
+    """Put the user into the group, unless it is a member already."""
+    if username in grp.getgrnam(group).gr_mem:
+        return
+
+    try:
+        subprocess.run(["usermod", "-aG", group, username], check=True)
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise GameMasterError(
+            f"Could not add '{username}' to the group '{group}': {error}"
+        ) from error
+
+    print(f"Added the user '{username}' to the group '{group}'.")
 
 
 def get_agent_user(settings: dict[str, str]) -> str:
@@ -573,7 +589,7 @@ def agent(arguments: argparse.Namespace) -> None:
         print("\nNo terminal, so no key is asked for.")
         return
 
-    answer = input(f"\nIs the key of the agent among them? [y/N] ").strip().lower()
+    answer = input("\nIs the key of the agent among them? [y/N] ").strip().lower()
     if answer in ("y", "yes", "j", "ja"):
         return
 
