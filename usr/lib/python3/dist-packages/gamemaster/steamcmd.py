@@ -48,6 +48,37 @@ def find() -> str:
     return program
 
 
+def _environment(account: pwd.struct_passwd, username: str) -> dict[str, str]:
+    """Return the environment SteamCMD is started with."""
+    environment = {
+        name: value
+        for name, value in os.environ.items()
+        if not name.startswith(XDG_PREFIX)
+    }
+    environment["HOME"] = account.pw_dir
+    environment["USER"] = username
+    environment["LOGNAME"] = username
+    return environment
+
+
+def _run(
+    command: list[str], account: pwd.struct_passwd, username: str
+) -> subprocess.CompletedProcess:
+    """Run SteamCMD as the server user."""
+    try:
+        return subprocess.run(
+            command,
+            cwd=account.pw_dir,
+            user=username,
+            group=account.pw_gid,
+            # Without this list SteamCMD would keep the groups of root
+            extra_groups=os.getgrouplist(username, account.pw_gid),
+            env=_environment(account, username),
+        )
+    except (OSError, LookupError) as error:
+        raise SteamCmdError(f"Could not start SteamCMD: {error}") from error
+
+
 def update(app_id: str, username: str, install_dir: str, branch: str) -> None:
     """Install or update an application, running as the server user."""
     program = find()
@@ -57,14 +88,10 @@ def update(app_id: str, username: str, install_dir: str, branch: str) -> None:
     except KeyError:
         raise SteamCmdError(f"The Linux user '{username}' does not exist.") from None
 
-    environment = {
-        name: value
-        for name, value in os.environ.items()
-        if not name.startswith(XDG_PREFIX)
-    }
-    environment["HOME"] = account.pw_dir
-    environment["USER"] = username
-    environment["LOGNAME"] = username
+    # SteamCMD brings itself up to date the first time a user runs it, and an
+    # app_update in that same run fails with "Missing configuration". So it is
+    # started once and told to do nothing; after that the real run works.
+    _run([program, "+quit"], account, username)
 
     command = [
         program,
@@ -76,18 +103,7 @@ def update(app_id: str, username: str, install_dir: str, branch: str) -> None:
         command += ["-beta", branch]
     command += ["validate", "+quit"]
 
-    try:
-        result = subprocess.run(
-            command,
-            cwd=account.pw_dir,
-            user=username,
-            group=account.pw_gid,
-            # Without this list SteamCMD would keep the groups of root
-            extra_groups=os.getgrouplist(username, account.pw_gid),
-            env=environment,
-        )
-    except (OSError, LookupError) as error:
-        raise SteamCmdError(f"Could not start SteamCMD: {error}") from error
+    result = _run(command, account, username)
 
     if result.returncode != 0:
         raise SteamCmdError(f"SteamCMD ended with exit code {result.returncode}.")
