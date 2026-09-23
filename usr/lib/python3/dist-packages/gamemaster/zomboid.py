@@ -564,7 +564,11 @@ def build_unit(server: Server, worldname: str) -> str:
 
     content = context.read_template(SERVICE_TEMPLATE)
     for marker, value in (
+        # The service runs as the server user, but 'zomboid -u' wants the
+        # name the server is registered under. They are usually the same
+        # and do not have to be.
         ("@USER@", server.server_user),
+        ("@CONF_USER@", server.username),
         ("@WORLD@", worldname),
         ("@INSTALL_DIR@", str(server.install_dir)),
         ("@LOG_FILE@", str(log_file)),

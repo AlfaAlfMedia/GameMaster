@@ -12,6 +12,13 @@ Type=simple
 User=@USER@
 Group=@USER@
 WorkingDirectory=@INSTALL_DIR@
+
+# Fetch a new version of the server before it starts.
+#   +  run this as root, not as the server user: it reads the settings of
+#      the server, which only root may read
+#   -  a failed update must not keep the server from starting
+ExecStartPre=-+/usr/sbin/zomboid -u @CONF_USER@ update
+
 ExecStart=@INSTALL_DIR@/start-server.sh -servername @WORLD@
 
 # The server is stopped over RCON, which saves the world first. Systemd
@@ -19,6 +26,9 @@ ExecStart=@INSTALL_DIR@/start-server.sh -servername @WORLD@
 Restart=no
 KillSignal=SIGTERM
 TimeoutStopSec=180
+
+# SteamCMD may take a long time, and that time counts towards the start
+TimeoutStartSec=1800
 
 StandardOutput=append:@LOG_FILE@
 StandardError=append:@LOG_FILE@

@@ -131,6 +131,11 @@ the only place where the world of a running server is written down.
 which is why it also recognises a server that was set up by hand.
 `zomboid world switch` writes the service again and reloads it.
 
+Before the server starts, the service updates it: `ExecStartPre` calls
+`zomboid update`. It runs as root, because the settings of a server may only
+be read by root, and a failed update does not keep the server from starting.
+SteamCMD can take a while, so the service allows half an hour for its start.
+
 `zomboid world init` is the only place in the whole program where a server is
 started by hand. Everything after that goes through systemd.
 
