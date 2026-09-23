@@ -145,8 +145,22 @@ the server to quit, and waits until it is gone.
 ## The agent
 
 `usr/share/doc/gamemaster/SOUL.md` describes what the agent may do, in the
-form of a profile for it. It is the counterpart of the sudoers file: the
-sudoers file enforces the boundary, SOUL.md explains it.
+form of a profile for it.
+
+What the sudoers file enforces is the machine: the agent may run one
+program, and nothing else. No packages, no users, no services, no files
+outside the servers it looks after. That boundary is real and does not
+depend on the agent behaving.
+
+Inside the game there is no such boundary, and there cannot be one. The
+agent is allowed to read the ini file of a world, because that is where the
+settings and the mod list live - and that file also holds the RCON password.
+Anyone who can read it can talk to the server themselves and use every
+command it has, not only the ones this program offers. The choice is
+therefore between an agent that can edit settings and mods, and one that is
+held to a subset of the RCON commands. GameMaster takes the first: within
+the game the agent is a full administrator, and only SOUL.md tells it what
+to leave alone.
 
 `gamemaster agent` shows which keys may log in as the agent user, with their
 fingerprints, and adds one.
