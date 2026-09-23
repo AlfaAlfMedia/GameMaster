@@ -25,35 +25,21 @@ program then offers the next free one.
 
 import argparse
 import getpass
-import grp
-import os
 import pwd
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-from gamemaster import configfile, validate
+from gamemaster import configfile, context, sshkey, steamcmd, validate
 from gamemaster.errors import GameMasterError
 
-ETC_DIR = Path("/etc/gamemaster")
-ZOMBOID_ETC_DIR = ETC_DIR / "zomboid"
-GAMEMASTER_CONF_FILE = ETC_DIR / "gamemaster.conf"
+ZOMBOID_ETC_DIR = context.ETC_DIR / "zomboid"
+GAMEMASTER_CONF_FILE = context.GAMEMASTER_CONF_FILE
 
 ZOMBOID_TEMPLATE_FILE = Path("/usr/share/gamemaster/zomboid/template.conf")
 
 SERVER_SCRIPT = "start-server.sh"
-
-# Name Steam gives the stable branch of every application
-STEAM_STABLE_BRANCH = "public"
-
-# Debian installs steamcmd to /usr/games, which is not on the PATH that sudo
-# sets
-STEAMCMD = "steamcmd"
-STEAMCMD_EXTRA_PATH = "/usr/games"
-
-# Group that every game server user belongs to
-STEAM_GROUP = "steam"
 
 LOGIN_SHELL = "/bin/bash"
 
@@ -64,32 +50,6 @@ PORT_SETTINGS = {
     "PZ_UDP_PORT": "--udp-port",
     "PZ_RCON_PORT": "--rcon-port",
 }
-
-
-def check_root() -> None:
-    """End with an error if the program is not run as root."""
-    if os.geteuid() != 0:
-        raise GameMasterError(
-            "This command must be run as root (for example with sudo)."
-        )
-
-
-def read_settings(path: Path) -> dict[str, str]:
-    """Return the settings of a configuration file."""
-    try:
-        return configfile.read_values(path.read_text(encoding="utf-8"))
-    except OSError as error:
-        raise GameMasterError(f"Could not read {path}: {error}") from error
-
-
-def read_template() -> str:
-    """Return the content of the template for a server configuration."""
-    try:
-        return ZOMBOID_TEMPLATE_FILE.read_text(encoding="utf-8")
-    except OSError as error:
-        raise GameMasterError(
-            f"Could not read the template {ZOMBOID_TEMPLATE_FILE}: {error}"
-        ) from error
 
 
 def user_exists(username: str) -> bool:
@@ -155,21 +115,6 @@ def get_default_install_dir(template: str) -> str:
     )
 
 
-def add_user_to_group(username: str, group: str) -> None:
-    """Put the user into the group, unless it is a member already."""
-    if username in grp.getgrnam(group).gr_mem:
-        return
-
-    try:
-        subprocess.run(["usermod", "-aG", group, username], check=True)
-    except (OSError, subprocess.CalledProcessError) as error:
-        raise GameMasterError(
-            f"Could not add '{username}' to the group '{group}': {error}"
-        ) from error
-
-    print(f"Added the user '{username}' to the group '{group}'.")
-
-
 def get_agent_user(settings: dict[str, str]) -> str:
     """Return GM_AGENT_USER, the user an AI agent connects as."""
     return validate.parse_username(get_setting(settings, "GM_AGENT_USER"))
@@ -204,7 +149,7 @@ def used_ports() -> dict[int, str]:
         return taken
 
     for conf_file in sorted(ZOMBOID_ETC_DIR.glob("*.conf")):
-        settings = read_settings(conf_file)
+        settings = context.read_settings(conf_file)
         for key in PORT_SETTINGS:
             value = settings.get(key, "")
             if value.isdigit():
@@ -367,29 +312,6 @@ def register_zomboid(
 # ---------------------------------------------------------------------------
 
 
-def find_steamcmd() -> str:
-    """Return the path of SteamCMD."""
-    search_path = os.pathsep.join(
-        part for part in (os.environ.get("PATH", ""), STEAMCMD_EXTRA_PATH) if part
-    )
-    steamcmd = shutil.which(STEAMCMD, path=search_path)
-    if steamcmd is None:
-        raise GameMasterError(
-            "SteamCMD was not found. On Debian it is in the package 'steamcmd' "
-            "from the section non-free, which also needs the architecture "
-            "i386: https://developer.valvesoftware.com/wiki/SteamCMD#Linux"
-        )
-    return steamcmd
-
-
-def check_steam_group() -> None:
-    """End with an error if the group of the game server users is missing."""
-    try:
-        grp.getgrnam(STEAM_GROUP)
-    except KeyError:
-        raise GameMasterError(f"The group '{STEAM_GROUP}' does not exist.") from None
-
-
 def check_install_target(install_dir: str, username: str, exists: bool) -> None:
     """End with an error if the server cannot be installed into the directory."""
     if has_server(install_dir):
@@ -440,7 +362,6 @@ def create_user(username: str, password: str) -> None:
                 "useradd",
                 "--create-home",
                 "--user-group",
-                "--groups", STEAM_GROUP,
                 "--shell", LOGIN_SHELL,
                 username,
             ],
@@ -474,52 +395,6 @@ def prepare_install_dir(install_dir: str, username: str) -> None:
         raise GameMasterError(f"Could not prepare {install_dir}: {error}") from error
 
 
-def run_steamcmd(
-    steamcmd: str, app_id: str, username: str, install_dir: str, branch: str
-) -> None:
-    """Install the server with SteamCMD, running as the server user."""
-    account = pwd.getpwnam(username)
-
-    environment = dict(os.environ)
-    environment["HOME"] = account.pw_dir
-    environment["USER"] = username
-    environment["LOGNAME"] = username
-
-    command = [
-        steamcmd,
-        "+force_install_dir", install_dir,
-        "+login", "anonymous",
-        "+app_update", app_id,
-    ]
-    if branch != STEAM_STABLE_BRANCH:
-        command += ["-beta", branch]
-    command += ["validate", "+quit"]
-
-    print(f"Installing the Project Zomboid server into {install_dir} "
-          f"(branch '{branch}') ...", flush=True)
-
-    try:
-        result = subprocess.run(
-            command,
-            cwd=account.pw_dir,
-            user=username,
-            group=account.pw_gid,
-            extra_groups=os.getgrouplist(username, account.pw_gid),
-            env=environment,
-        )
-    except (OSError, LookupError) as error:
-        raise GameMasterError(f"Could not start SteamCMD: {error}") from error
-
-    if result.returncode != 0:
-        raise GameMasterError(f"SteamCMD ended with exit code {result.returncode}.")
-
-    # SteamCMD does not always report a failed download in its exit code
-    if not has_server(install_dir):
-        raise GameMasterError(
-            f"SteamCMD finished, but there is no {SERVER_SCRIPT} in {install_dir}."
-        )
-
-
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
@@ -527,8 +402,8 @@ def run_steamcmd(
 
 def add_zomboid(arguments: argparse.Namespace) -> None:
     """gamemaster add zomboid [options]"""
-    settings = read_settings(GAMEMASTER_CONF_FILE)
-    template = read_template()
+    settings = context.read_settings(GAMEMASTER_CONF_FILE)
+    template = context.read_template(ZOMBOID_TEMPLATE_FILE)
     username = check_username(arguments.username or get_default_username(settings))
     install_dir = check_install_dir(
         arguments.installdir or get_default_install_dir(template)
@@ -544,8 +419,8 @@ def add_zomboid(arguments: argparse.Namespace) -> None:
 
 def install_zomboid(arguments: argparse.Namespace) -> None:
     """gamemaster install zomboid [options]"""
-    settings = read_settings(GAMEMASTER_CONF_FILE)
-    template = read_template()
+    settings = context.read_settings(GAMEMASTER_CONF_FILE)
+    template = context.read_template(ZOMBOID_TEMPLATE_FILE)
     username = validate.parse_username(
         arguments.username or get_default_username(settings)
     )
@@ -558,21 +433,29 @@ def install_zomboid(arguments: argparse.Namespace) -> None:
     )
     agent = get_agent_user(settings)
 
-    steamcmd = find_steamcmd()
-    check_steam_group()
+    # Before anything is created: without SteamCMD nothing can be installed
+    steamcmd.find()
     check_not_registered(username)
     exists = user_exists(username)
     check_install_target(install_dir, username, exists)
 
     ports = choose_ports(template, arguments)
 
-    if exists:
-        add_user_to_group(username, STEAM_GROUP)
-    else:
+    if not exists:
         create_user(username, ask_for_password(username))
 
     prepare_install_dir(install_dir, username)
-    run_steamcmd(steamcmd, app_id, username, install_dir, branch)
+
+    print(f"Installing the Project Zomboid server into {install_dir} "
+          f"(branch '{branch}') ...", flush=True)
+    steamcmd.update(app_id, username, install_dir, branch)
+
+    # SteamCMD does not always report a failed download in its exit code
+    if not has_server(install_dir):
+        raise GameMasterError(
+            f"SteamCMD finished, but there is no {SERVER_SCRIPT} in "
+            f"{install_dir}."
+        )
 
     register_zomboid(agent, template, username, install_dir, branch, ports)
 
@@ -625,6 +508,85 @@ def add_server_options(parser: argparse.ArgumentParser) -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# The agent user
+# ---------------------------------------------------------------------------
+
+
+def show_agent_keys(agent: str) -> list[sshkey.PublicKey]:
+    """List the keys that may log in as the agent user, and return them."""
+    keys = sshkey.read_keys(agent)
+    path = sshkey.authorized_keys_file(agent)
+
+    print(f"Agent user:      {agent}")
+    print(f"Keys are kept in {path}")
+
+    if not keys:
+        print("There is no key yet, so the agent cannot log in.")
+        return keys
+
+    print(f"\n{len(keys)} key(s) may log in as '{agent}':")
+    for number, key in enumerate(keys, start=1):
+        comment = key.comment or "(no comment)"
+        print(f"  {number}) {key.type:<12} {key.fingerprint}  {comment}")
+
+    return keys
+
+
+def ask_for_key() -> sshkey.PublicKey | None:
+    """Ask for a public key and return it, or None if none was given."""
+    print(
+        "\nPaste the public key of the agent - one line, as it stands in its "
+        ".pub file.\nLeave empty to add nothing."
+    )
+
+    while True:
+        text = input("Key: ").strip()
+        if not text:
+            return None
+        try:
+            return sshkey.parse(text)
+        except sshkey.SshKeyError as error:
+            print(f"That is not a usable key: {error}")
+
+
+def agent(arguments: argparse.Namespace) -> None:
+    """gamemaster agent [--list]"""
+    settings = context.read_settings(GAMEMASTER_CONF_FILE)
+    name = get_agent_user(settings)
+
+    try:
+        pwd.getpwnam(name)
+    except KeyError:
+        raise GameMasterError(
+            f"The agent user '{name}' does not exist. The GameMaster package "
+            f"creates it; check {GAMEMASTER_CONF_FILE} if it is named "
+            f"differently here."
+        ) from None
+
+    show_agent_keys(name)
+
+    if arguments.list_only:
+        return
+
+    if not sys.stdin.isatty():
+        print("\nNo terminal, so no key is asked for.")
+        return
+
+    answer = input(f"\nIs the key of the agent among them? [y/N] ").strip().lower()
+    if answer in ("y", "yes", "j", "ja"):
+        return
+
+    key = ask_for_key()
+    if key is None:
+        print("Nothing added.")
+        return
+
+    path = sshkey.add_key(name, key)
+    print(f"Added {key.fingerprint} to {path}")
+    print(f"The agent can now log in as '{name}' with that key.")
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Describe the command line: commands, games, options."""
     parser = argparse.ArgumentParser(
@@ -658,6 +620,16 @@ def build_parser() -> argparse.ArgumentParser:
              f"(default: PZ_DEFAULT_BRANCH from {GAMEMASTER_CONF_FILE})",
     )
 
+    agent_parser = commands.add_parser(
+        "agent", help="the keys the agent user may log in with"
+    )
+    agent_parser.add_argument(
+        "--list",
+        dest="list_only",
+        action="store_true",
+        help="only show the keys, do not ask for one",
+    )
+
     return parser
 
 
@@ -665,20 +637,16 @@ def main() -> int:
     """Start of the program. Returns the exit code (0 = everything ok)."""
     arguments = build_parser().parse_args()
 
-    try:
-        check_root()
+    def carry_out() -> None:
+        context.require_root()
         if arguments.command == "add" and arguments.game == "zomboid":
             add_zomboid(arguments)
         elif arguments.command == "install" and arguments.game == "zomboid":
             install_zomboid(arguments)
-    except GameMasterError as error:
-        print(f"ERROR: {error}", file=sys.stderr)
-        return 1
-    except (KeyboardInterrupt, EOFError):
-        print("\nCancelled.", file=sys.stderr)
-        return 1
+        elif arguments.command == "agent":
+            agent(arguments)
 
-    return 0
+    return context.run(carry_out)
 
 
 if __name__ == "__main__":

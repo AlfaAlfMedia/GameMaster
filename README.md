@@ -19,11 +19,18 @@ For Project Zomboid it can currently:
 - install a server with SteamCMD, creating its Linux user if needed, and
   register it (`gamemaster install zomboid`)
 - register an existing server, including its ports (`gamemaster add zomboid`)
-- create the files of a new world (`zomboid_create_world_files`)
-- list the worlds of a server and their state (`zomboid_list_worlds`)
-- let a server create a world once and stop it again
-  (`zomboid_initialise_world`)
-- talk to a running server over RCON (library)
+- show which keys the agent user may log in with, and add one
+  (`gamemaster agent`)
+- create the files of a new world (`zomboid world create`)
+- let a server create a world once, stop it again and write its systemd
+  service (`zomboid world init`)
+- list the worlds of a server and their state (`zomboid world list`)
+- let the service load another world (`zomboid world switch`)
+- say whether a server is running and which world it has loaded
+  (`zomboid status`)
+- start and stop a server, save its world, message its players, list and
+  kick or ban them, read and change the server options (`zomboid`)
+- update the server and its mods (`zomboid update`)
 
 ## Idea
 
@@ -52,18 +59,28 @@ etc/
 usr/
   sbin/
     gamemaster                  administration tool, run by a human only:
-                                install and register servers
-    zomboid_create_world_files  create the files of a new world
-    zomboid_initialise_world    let the server create the world once
-    zomboid_list_worlds         list worlds and their state
+                                install and register servers, keys of the
+                                agent user
+    zomboid                     run a server: status, start, stop, save,
+                                message, update, worlds, players, options
   share/gamemaster/zomboid/
     template.conf               template for a server configuration
     template.ini                template for a world
     template_SandboxVars.lua    template for the sandbox settings
+    template.service            template for the systemd service
+  share/doc/gamemaster/
+    SOUL.md                     the profile of the agent (German), what
+                                it may do and what it may not
   lib/python3/dist-packages/gamemaster/
     errors.py                   the error all programs report
     validate.py                 checks for values that come from outside
     configfile.py               reading and changing KEY=VALUE files
+    context.py                  what every program needs before it starts:
+                                root, settings, templates, error handling
+    process.py                  the running processes of a Linux user
+    service.py                  writing and controlling a systemd service
+    steamcmd.py                 installing and updating with SteamCMD
+    sshkey.py                   public keys and authorized_keys
     rcon.py                     the Source RCON protocol
     zomboid.py                  worlds and commands of a Zomboid server
 ```
@@ -83,6 +100,52 @@ beside `zomboid.py`.
 Values that reach a program from outside — the command line, a configuration
 file, later an agent — are checked in one place. Each check returns the
 cleaned value or raises, so a program never works with something unchecked.
+
+## Creating a world
+
+A world is created in three steps, and the middle one belongs to a person.
+
+```
+zomboid world create NAME     the ini file, the sandbox file, the save directory
+                              -- edit those two: settings, mods --
+zomboid world init NAME       the server runs once, then it is ready
+zomboid start                 from now on it runs as a service
+```
+
+Only three things have to exist before a world can start: the ini file, the
+sandbox file and the directory below `Saves/Multiplayer`. Everything else is
+created by the server itself on its first start. That first start is also the
+only reason it exists: the admin password is handed over on the command line
+there, so that it reaches the database of the world, and the settings are
+read in. Once the server answers over RCON the world is known to be sound; it
+is stopped again and its systemd service is written.
+
+## Running a server
+
+A server runs as the systemd service `zomboid-<user>.service`. There is one
+service per user, because a user has one server and that server has one
+world — Project Zomboid writes everything below `~/Zomboid`.
+
+The world is named in the `ExecStart` line of the service, and that line is
+the only place where the world of a running server is written down.
+`zomboid status` reads it back from the command line of the running process,
+which is why it also recognises a server that was set up by hand.
+`zomboid world switch` writes the service again and reloads it.
+
+`zomboid world init` is the only place in the whole program where a server is
+started by hand. Everything after that goes through systemd.
+
+`zomboid stop` does not kill the process: it saves the world over RCON, asks
+the server to quit, and waits until it is gone.
+
+## The agent
+
+`usr/share/doc/gamemaster/SOUL.md` describes what the agent may do, in the
+form of a profile for it. It is the counterpart of the sudoers file: the
+sudoers file enforces the boundary, SOUL.md explains it.
+
+`gamemaster agent` shows which keys may log in as the agent user, with their
+fingerprints, and adds one.
 
 ## Configuration
 
@@ -108,7 +171,6 @@ gamemaster install zomboid [-u USERNAME] [-d DIRECTORY]
 - If the Linux user does not exist, it is created with a home directory and a
   group of its own. Its password is asked for twice; it is never taken from
   the command line.
-- The user is put into the group `steam`.
 - SteamCMD runs as that user, never as root, so the server belongs to the user
   from the start and can later be updated by it.
 - Without `--beta` the stable branch is installed.
@@ -129,15 +191,12 @@ permissions `0660` and belongs to the server user and its group.
 ## Not there yet
 
 - Debian package (`debian/`), and with it an installation procedure
-- one systemd service per world
-- starting, stopping and status of a running server
-- a program that exposes the RCON commands on the command line
 - more games
 
 ## Requirements
 
 - Linux with systemd
 - Python 3.10 or newer
-- the group `steam`
+- `sudo`, for the agent user
 - SteamCMD, to install servers with `gamemaster install`
 - one Linux user per game server

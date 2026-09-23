@@ -1,0 +1,32 @@
+# Template for the systemd service of one Project Zomboid server.
+# Written by 'zomboid world init'. Do not edit a generated unit by hand -
+# 'zomboid world switch' writes it again.
+#
+# @USER@         the Linux user the server belongs to
+# @WORLD@        the world the server loads
+# @INSTALL_DIR@  where the server is installed
+# @LOG_FILE@     where the output of the server goes
+
+[Unit]
+Description=Project Zomboid Dedicated Server (@USER@, world @WORLD@)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@USER@
+WorkingDirectory=@INSTALL_DIR@
+ExecStart=@INSTALL_DIR@/start-server.sh -servername @WORLD@
+
+# The server is stopped over RCON, which saves the world first. Systemd
+# only has to wait for it; it must not start it again by itself.
+Restart=no
+KillSignal=SIGTERM
+TimeoutStopSec=180
+
+StandardOutput=append:@LOG_FILE@
+StandardError=append:@LOG_FILE@
+
+[Install]
+WantedBy=multi-user.target

@@ -5,9 +5,6 @@
 # These are exactly the actions an AI agent, connecting as the user
 # gamemaster, is allowed to perform.
 
-Cmnd_Alias GAMEMASTER_COMMANDS = \
-    /usr/sbin/zomboid_create_world_files, \
-    /usr/sbin/zomboid_initialise_world, \
-    /usr/sbin/zomboid_list_worlds
+Cmnd_Alias GAMEMASTER_COMMANDS = /usr/sbin/zomboid
 
 gamemaster ALL=(root) NOPASSWD: GAMEMASTER_COMMANDS
