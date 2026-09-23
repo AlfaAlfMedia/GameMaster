@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+# The sudoers file is only read when nobody but root may change it
+override_dh_fixperms:
+	dh_fixperms
+	chmod 0440 debian/gamemaster/etc/sudoers.d/gamemaster
+
+# SOUL.md is meant to be copied into the profile of an agent, so it must
+# stay readable and not end up as a gzip file
+override_dh_compress:
+	dh_compress -X SOUL.md

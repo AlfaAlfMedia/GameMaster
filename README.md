@@ -5,9 +5,8 @@ by an AI agent over a narrow, explicitly granted set of commands.
 
 The first supported game is **Project Zomboid**.
 
-> **Status: in development.** There is no package yet and no installation
-> procedure. The layout of this repository already mirrors the file system,
-> so that a Debian package can be built from it later.
+> **Status: in development.** The Debian package builds and installs, but
+> nothing has yet run against a real Project Zomboid server.
 
 ## What it does
 
@@ -188,9 +187,29 @@ belongs to `root`.
 The world's own settings file gets the RCON password, so it is created with
 permissions `0660` and belongs to the server user and its group.
 
+## Building the package
+
+The repository mirrors the file system it installs into, so the package is
+built from it directly:
+
+```
+dpkg-buildpackage -us -uc -b
+```
+
+Build on a Linux file system, not on a mounted Windows drive: the package
+takes the execute bits from the files, and a Windows share does not keep
+them.
+
+Installing it creates the agent user and the directories below
+`/etc/gamemaster` and `/var/log/gamemaster`. Removing it leaves everything
+alone. Purging it stops the services of the servers, removes them, and takes
+away `/etc/gamemaster`, `/var/log/gamemaster` and the agent user — but never
+the save games, the installed servers or their Linux users. After a purge the
+game servers keep running; they are only no longer managed from here.
+
 ## Not there yet
 
-- Debian package (`debian/`), and with it an installation procedure
+- manual pages for `gamemaster` and `zomboid`
 - more games
 
 ## Requirements

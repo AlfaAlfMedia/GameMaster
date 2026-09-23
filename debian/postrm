@@ -1,0 +1,44 @@
+#!/bin/sh
+# On purge, take away everything GameMaster created - and nothing else.
+#
+# The save games below the home directory of a server user, the installed
+# servers and the server users themselves are left alone. After a purge the
+# game servers keep running; they are only no longer managed from here.
+set -e
+
+case "$1" in
+    remove|purge)
+        # Python writes these while the programs run, so dpkg does not know
+        # about them and would leave the directory behind
+        rm -rf /usr/lib/python3/dist-packages/gamemaster/__pycache__
+        ;;
+esac
+
+case "$1" in
+    purge)
+        # The service files were written by 'zomboid world init' and do not
+        # belong to the package, so debhelper does not know about them.
+        for unit in /etc/systemd/system/zomboid-*.service; do
+            [ -e "$unit" ] || continue
+            name=$(basename "$unit")
+            systemctl stop "$name" >/dev/null 2>&1 || true
+            systemctl disable "$name" >/dev/null 2>&1 || true
+            rm -f "$unit"
+        done
+        systemctl daemon-reload >/dev/null 2>&1 || true
+
+        # Holds the passwords of the registered servers. The servers do not
+        # need them: the RCON password also stands in the ini file of the
+        # world, the admin password in its database.
+        rm -rf /etc/gamemaster
+        rm -rf /var/log/gamemaster
+
+        if getent passwd gamemaster >/dev/null; then
+            deluser --system --remove-home gamemaster >/dev/null 2>&1 || true
+        fi
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0
