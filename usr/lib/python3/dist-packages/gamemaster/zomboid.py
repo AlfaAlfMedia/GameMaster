@@ -39,8 +39,10 @@ def find_worlds(data_dir: Path) -> tuple[list[str], list[str]]:
     multiplayer_dir = data_dir / MULTIPLAYER_SUBDIR
     database_dir = data_dir / DATABASE_SUBDIR
 
+    # Before the first world is created there is nothing here at all, and
+    # that is not an error: the server has no worlds yet.
     if not server_dir.is_dir():
-        raise GameMasterError(f"{server_dir} does not exist.")
+        return [], []
 
     playable: list[str] = []
     created: list[str] = []
@@ -459,12 +461,36 @@ def build_ini(template: str, worldname: str, server: Server) -> str:
     return content
 
 
+def prepare_data_dir(server: Server) -> None:
+    """Create the directories Project Zomboid keeps its data in.
+
+    The server builds them itself on its first start, but the files of the
+    first world have to be written before that ever happens.
+    """
+    for directory in (
+        server.data_dir,
+        server.data_dir / SERVER_SUBDIR,
+        server.data_dir / MULTIPLAYER_SUBDIR,
+    ):
+        if directory.is_dir():
+            continue
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            raise GameMasterError(
+                f"Could not create {directory}: {error}"
+            ) from error
+        _hand_over(directory, server.server_user, DIRECTORY_MODE)
+
+
 def create_world_files(server: Server, worldname: str) -> tuple[Path, Path, Path]:
     """Create the ini file, the sandbox file and the save directory.
 
     Those three are all a world needs before its first start. Everything
     else is created by the server itself when the world is initialised.
     """
+    prepare_data_dir(server)
+
     ini_file, sandbox_file, save_dir = world_paths(server.data_dir, worldname)
 
     for path in (ini_file, sandbox_file, save_dir):

@@ -116,6 +116,36 @@ def get_default_install_dir(template: str) -> str:
     )
 
 
+def open_home_to_group(username: str) -> None:
+    """Let the group of the server user enter its home directory.
+
+    The worlds and the logs of a server live below its home directory, and
+    the agent reads them as a member of that user's group. A home that only
+    its owner may enter would make every one of those files unreachable, no
+    matter what the files themselves allow.
+    """
+    home = Path(pwd.getpwnam(username).pw_dir)
+
+    try:
+        mode = home.stat().st_mode & 0o777
+    except OSError as error:
+        raise GameMasterError(f"Could not look at {home}: {error}") from error
+
+    # Group needs r-x: x to enter the directory, r to list what is in it
+    wanted = mode | 0o050
+    if wanted == mode:
+        return
+
+    try:
+        home.chmod(wanted)
+    except OSError as error:
+        raise GameMasterError(
+            f"Could not open {home} to the group '{username}': {error}"
+        ) from error
+
+    print(f"Opened {home} to the group '{username}' (now {wanted:04o}).")
+
+
 def add_user_to_group(username: str, group: str) -> None:
     """Put the user into the group, unless it is a member already."""
     if username in grp.getgrnam(group).gr_mem:
@@ -320,6 +350,7 @@ def register_zomboid(
 ) -> None:
     """Write the configuration of the server and let the agent read its files."""
     write_zomboid_config(template, username, install_dir, branch, ports)
+    open_home_to_group(username)
     add_agent_to_group(username, agent)
 
 
