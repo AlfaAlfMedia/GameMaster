@@ -441,6 +441,10 @@ def run_first_start(server: zomboid.Server, worldname: str) -> None:
             "playable. See the log file."
         )
 
+    database = zomboid.secure_database(server, worldname)
+    if database is not None:
+        context.report(f"database closed to others: {database}")
+
     context.report(f"world '{worldname}' initialised")
 
 

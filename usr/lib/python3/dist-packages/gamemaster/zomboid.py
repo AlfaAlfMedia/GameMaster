@@ -540,6 +540,24 @@ def prepare_log_directory(server: Server) -> Path:
     return directory
 
 
+def secure_database(server: Server, worldname: str) -> Path | None:
+    """Take the database of a world away from everyone but its server.
+
+    The server creates it world readable and world writable, and the admin
+    password of the world is kept in it. Only the server user and its group
+    have any business there.
+    """
+    database = server.data_dir / DATABASE_SUBDIR / f"{worldname}.db"
+    if not database.is_file():
+        return None
+
+    if database.stat().st_mode & 0o777 == FILE_MODE:
+        return None
+
+    _hand_over(database, server.server_user, FILE_MODE)
+    return database
+
+
 def build_unit(server: Server, worldname: str) -> str:
     """Return the unit file of this server, filled in from the template."""
     log_file = log_directory(server) / f"{worldname}.log"
