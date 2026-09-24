@@ -342,6 +342,11 @@ usr/
 - manual pages for `gamemaster` and `zomboid`
 - more games
 
+## Development note
+
+The source code of this project was generated with Claude
+under human direction, review and testing.
+
 ## License
 
 GPL-3.0-or-later, see [LICENSE](LICENSE).
