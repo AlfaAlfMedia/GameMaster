@@ -1,0 +1,736 @@
+#!/usr/bin/python3
+"""Run a Project Zomboid server. Must be run as root.
+
+Usage:
+    zomboid [-u|--username USERNAME] COMMAND ...
+
+Setting a machine up is the job of 'gamemaster' and stays there: it
+creates the Linux user, installs the server and registers it. From then
+on this program takes over.
+
+A server runs as the systemd service zomboid-<username>. There is one
+service per user, because a user has one server and that server has one
+world - everything is written below ~/Zomboid.
+
+    zomboid status                    is a server running, with which world
+    zomboid start                     start the service
+    zomboid stop                      save the world and shut the server down
+    zomboid save                      save the world, keep the server up
+    zomboid message "TEXT"            send a message to every player
+    zomboid update                    update the server with SteamCMD
+    zomboid update mods [-c|--check]  let the server fetch its mods again
+
+    zomboid world list                worlds of this server and their state
+    zomboid world create NAME         create ini, sandbox file and save dir
+    zomboid world init NAME           first start, then write the service
+    zomboid world switch NAME         let the service load another world
+
+    zomboid player list
+    zomboid player kick NAME [-r|--reason TEXT]
+    zomboid player ban NAME [-r|--reason TEXT] [--ip]
+    zomboid player unban NAME
+    zomboid player banid STEAMID | unbanid STEAMID
+    zomboid player banip ADDRESS | unbanip ADDRESS
+    zomboid player level NAME LEVEL
+    zomboid option list | set | reload
+
+Creating a world takes three steps, and the middle one is yours:
+
+    1. zomboid world create NAME      the three files a world needs
+    2. edit the ini and the lua file  settings, mods
+    3. zomboid world init NAME        the server runs once, so the admin
+                                      password and the settings reach the
+                                      database and the remaining files are
+                                      created. Afterwards it is stopped
+                                      again and the service is written.
+
+Without -u the user PZ_DEFAULT_USER from /etc/gamemaster/gamemaster.conf
+is taken. Every command reports short lines on standard output and returns
+0 or 1.
+"""
+
+import argparse
+import os
+import pwd
+import subprocess
+import sys
+import time
+
+from gamemaster import context, service, validate, zomboid
+from gamemaster.errors import GameMasterError
+
+# How long the server may take to come up, how often it is asked, and how
+# often a line is printed while waiting
+STARTUP_TIMEOUT = 300.0
+CHECK_INTERVAL = 2.0
+WAITING_MESSAGE_INTERVAL = 15.0
+
+# How long the server may take to disappear after the quit command
+SHUTDOWN_TIMEOUT = 120.0
+
+START_SCRIPT = "start-server.sh"
+
+
+# ---------------------------------------------------------------------------
+# Waiting
+# ---------------------------------------------------------------------------
+
+
+def wait_until_playable(server: zomboid.Server, worldname: str) -> None:
+    """Wait until the server answers over RCON, or raise after the timeout."""
+    context.report("waiting for the server")
+
+    start = time.monotonic()
+    deadline = start + STARTUP_TIMEOUT
+    next_message = start + WAITING_MESSAGE_INTERVAL
+
+    while time.monotonic() < deadline:
+        state, running = zomboid.server_state(server)
+
+        if state == zomboid.PLAYABLE and running.worldname == worldname:
+            return
+        if state == zomboid.NOT_RUNNING and time.monotonic() > start + CHECK_INTERVAL:
+            raise GameMasterError(
+                "The server stopped by itself. See the log file."
+            )
+
+        now = time.monotonic()
+        if now >= next_message:
+            context.report(f"still waiting ({now - start:.0f}s)")
+            next_message = now + WAITING_MESSAGE_INTERVAL
+
+        time.sleep(CHECK_INTERVAL)
+
+    raise GameMasterError(
+        f"The server was not reachable after {STARTUP_TIMEOUT:.0f} seconds. "
+        "See the log file."
+    )
+
+
+def wait_until_gone(server: zomboid.Server) -> None:
+    """Wait until no server process of this user is left."""
+    deadline = time.monotonic() + SHUTDOWN_TIMEOUT
+
+    while time.monotonic() < deadline:
+        if zomboid.find_running_server(server.server_user) is None:
+            return
+        time.sleep(CHECK_INTERVAL)
+
+    raise GameMasterError(
+        f"The server is still running {SHUTDOWN_TIMEOUT:.0f} seconds after "
+        "the quit command. It has been left alone."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Starting and stopping
+# ---------------------------------------------------------------------------
+
+
+def require_unit(server: zomboid.Server) -> str:
+    """Return the name of the service, or raise if it does not exist yet."""
+    name = zomboid.unit_name(server.username)
+    if not service.exists(name):
+        raise GameMasterError(
+            f"There is no service for user '{server.username}' yet. "
+            f"Initialise a world first: zomboid world init WORLDNAME."
+        )
+    return name
+
+
+def bring_up(server: zomboid.Server) -> str:
+    """Start the service and wait until the world can be joined."""
+    name = require_unit(server)
+    worldname = zomboid.unit_world(server)
+
+    if worldname is None:
+        raise GameMasterError(
+            f"The service {name}.service does not say which world to load."
+        )
+
+    context.report(f"starting world '{worldname}'")
+    service.start(name)
+    wait_until_playable(server, worldname)
+    context.report(f"world '{worldname}' is up")
+
+    return worldname
+
+
+def bring_down(server: zomboid.Server) -> str:
+    """Save the world, shut the server down and wait until it is gone."""
+    running = zomboid.require_running(server)
+    worldname = running.worldname
+
+    context.report(f"stopping world '{worldname}'")
+
+    with zomboid.rcon_for_world(server.data_dir, worldname) as connection:
+        connection.save()
+        context.report("world saved")
+        connection.quit_server()
+
+    wait_until_gone(server)
+
+    # The process is gone; make sure systemd agrees, in case the server was
+    # started as a service
+    name = zomboid.unit_name(server.username)
+    if service.exists(name) and service.is_active(name):
+        service.stop(name)
+
+    context.report(f"world '{worldname}' stopped")
+    return worldname
+
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+
+
+def show_status(server: zomboid.Server, _arguments: argparse.Namespace) -> None:
+    """Say whether a server is running and which world it has loaded."""
+    state, running = zomboid.server_state(server)
+    name = zomboid.unit_name(server.username)
+
+    context.report(f"user: {server.server_user}")
+    context.report(f"state: {state}")
+    context.report(f"service: {name}.service" if service.exists(name) else "service: none")
+
+    if service.exists(name):
+        context.report(f"service world: {zomboid.unit_world(server)}")
+
+    if running is None:
+        return
+
+    context.report(f"world: {running.worldname}")
+    context.report(f"process: {running.pid}")
+
+    if state == zomboid.PLAYABLE:
+        with zomboid.rcon_for_world(server.data_dir, running.worldname) as connection:
+            context.report("players:")
+            print(connection.players(), flush=True)
+
+
+def start_command(server: zomboid.Server, _arguments: argparse.Namespace) -> None:
+    """Start the service of this server."""
+    zomboid.require_stopped(server, "start it")
+    bring_up(server)
+
+
+def stop_command(server: zomboid.Server, _arguments: argparse.Namespace) -> None:
+    """Save the world and shut the server down."""
+    bring_down(server)
+
+
+def save_command(server: zomboid.Server, _arguments: argparse.Namespace) -> None:
+    """Save the world without stopping the server."""
+    running = zomboid.require_running(server)
+
+    with zomboid.rcon_for_world(server.data_dir, running.worldname) as connection:
+        connection.save()
+
+    context.report(f"world '{running.worldname}' saved")
+
+
+def message_command(server: zomboid.Server, arguments: argparse.Namespace) -> None:
+    """Send a message to every player on the server."""
+    running = zomboid.require_running(server)
+
+    with zomboid.rcon_for_world(server.data_dir, running.worldname) as connection:
+        connection.server_message(arguments.text)
+
+    context.report("message sent")
+
+
+def update_command(server: zomboid.Server, _arguments: argparse.Namespace) -> None:
+    """Update the installed server with SteamCMD."""
+    zomboid.require_stopped(server, "update the server")
+
+    settings = context.gamemaster_settings()
+    app_id = settings.get(zomboid.APP_ID_KEY)
+    if not app_id:
+        raise GameMasterError(
+            f"{zomboid.APP_ID_KEY} is not set in {context.GAMEMASTER_CONF_FILE}."
+        )
+
+    context.report(
+        f"updating {server.install_dir} (branch '{server.branch}') with SteamCMD"
+    )
+    zomboid.update_server(server, app_id)
+    context.report("server updated")
+
+
+def update_mods_command(server: zomboid.Server, arguments: argparse.Namespace) -> None:
+    """Let the server fetch its mods from Steam again.
+
+    Mods are listed in the ini file and downloaded by the server when it
+    starts, so updating them means starting the server again.
+    """
+    require_unit(server)
+    state, running = zomboid.server_state(server)
+
+    if state == zomboid.PLAYABLE:
+        with zomboid.rcon_for_world(server.data_dir, running.worldname) as connection:
+            connection.check_mods_need_update()
+        context.report("mod check started, the server writes the answer into its log")
+
+        if arguments.check_only:
+            return
+
+        bring_down(server)
+    elif arguments.check_only:
+        raise GameMasterError("The server must be running to check the mods.")
+
+    context.report("starting the server, which fetches the mods from Steam")
+    bring_up(server)
+
+
+# -- worlds -----------------------------------------------------------------
+
+
+def list_worlds_command(server: zomboid.Server, _arguments: argparse.Namespace) -> None:
+    """List the worlds of this server and say which one is running."""
+    playable, created = zomboid.find_worlds(server.data_dir)
+    _state, running = zomboid.server_state(server)
+    loaded = running.worldname if running else None
+
+    if not playable and not created:
+        context.report("no worlds")
+        return
+
+    if playable:
+        context.report("playable:")
+        for name in playable:
+            context.report(f"  {name}{' (running)' if name == loaded else ''}")
+
+    if created:
+        context.report("created, not initialised yet:")
+        for name in created:
+            context.report(f"  {name}")
+
+
+def create_world_command(server: zomboid.Server, arguments: argparse.Namespace) -> None:
+    """Create the three files a new world needs."""
+    worldname = validate.parse_worldname(arguments.name)
+
+    ini_file, sandbox_file, save_dir = zomboid.create_world_files(server, worldname)
+
+    context.report(f"created world '{worldname}' for user '{server.username}'")
+    context.report(f"settings: {ini_file}")
+    context.report(f"sandbox:  {sandbox_file}")
+    context.report(f"savegame: {save_dir}")
+    context.report("edit the two files, then run: "
+                   f"zomboid -u {server.username} world init {worldname}")
+
+
+def start_once(server: zomboid.Server, worldname: str, log) -> subprocess.Popen:
+    """Start the server by hand, only to let it create the world.
+
+    This is the single moment the server is not started as a service: the
+    admin password has to be handed over on the command line so that it
+    reaches the database.
+    """
+    script = server.install_dir / START_SCRIPT
+    if not script.is_file():
+        raise GameMasterError(
+            f"No Project Zomboid server found in {server.install_dir} "
+            f"({START_SCRIPT} is missing)."
+        )
+
+    try:
+        account = pwd.getpwnam(server.server_user)
+    except KeyError:
+        raise GameMasterError(
+            f"The Linux user '{server.server_user}' does not exist."
+        ) from None
+
+    environment = dict(os.environ)
+    environment["HOME"] = account.pw_dir
+    environment["USER"] = server.server_user
+    environment["LOGNAME"] = server.server_user
+
+    try:
+        return subprocess.Popen(
+            [
+                str(script),
+                "-servername", worldname,
+                "-adminpassword", server.admin_password,
+            ],
+            cwd=server.install_dir,
+            user=server.server_user,
+            group=account.pw_gid,
+            # Without this list the server would keep the groups of root
+            extra_groups=os.getgrouplist(server.server_user, account.pw_gid),
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            # Its own session, so that Ctrl+C reaches this program only and
+            # the server is stopped properly instead of being interrupted
+            start_new_session=True,
+        )
+    except (OSError, LookupError) as error:
+        raise GameMasterError(f"Could not start {script}: {error}") from error
+
+
+def init_world_command(server: zomboid.Server, arguments: argparse.Namespace) -> None:
+    """Let the server run once, then write its service.
+
+    The server is started by hand exactly once. That start hands over the
+    admin password, so it reaches the database, and lets the server create
+    everything a world needs beyond the three files. When it answers, the
+    world is known to be free of errors; it is stopped again and from then
+    on it runs as a service.
+    """
+    worldname = validate.parse_worldname(arguments.name)
+
+    zomboid.require_stopped(server, "initialise a world")
+
+    playable, created = zomboid.find_worlds(server.data_dir)
+    if worldname in playable:
+        context.report(f"world '{worldname}' is already initialised")
+    elif worldname not in created:
+        raise GameMasterError(
+            f"The world '{worldname}' cannot be initialised. "
+            "Run 'zomboid world list' to see which worlds are waiting."
+        )
+    else:
+        run_first_start(server, worldname)
+
+    path = zomboid.install_unit(server, worldname)
+    service.enable(zomboid.unit_name(server.username))
+    context.report(f"service written: {path}")
+    context.report(
+        f"world '{worldname}' is ready. Start it with: "
+        f"zomboid -u {server.username} start"
+    )
+
+
+def run_first_start(server: zomboid.Server, worldname: str) -> None:
+    """Carry out the one manual start that creates the world."""
+    directory = zomboid.prepare_log_directory(server)
+    log_file = directory / f"{worldname}-initialise.log"
+
+    try:
+        log = log_file.open("a", encoding="utf-8")
+    except OSError as error:
+        raise GameMasterError(f"Could not write {log_file}: {error}") from error
+
+    context.report(f"log file: {log_file}")
+    process = None
+
+    try:
+        process = start_once(server, worldname, log)
+        context.report(f"server started as '{server.server_user}'")
+
+        wait_until_playable(server, worldname)
+        context.report("server is up")
+        bring_down(server)
+        process = None
+    except (GameMasterError, KeyboardInterrupt) as error:
+        # Whatever went wrong, no server process of ours may be left behind
+        if process is not None and process.poll() is None:
+            context.report("cleaning up: stopping the server")
+            try:
+                bring_down(server)
+            except GameMasterError:
+                process.terminate()
+        if isinstance(error, KeyboardInterrupt):
+            raise GameMasterError("Cancelled before the world was finished.") from None
+        raise
+    finally:
+        log.close()
+
+    playable, _ = zomboid.find_worlds(server.data_dir)
+    if worldname not in playable:
+        raise GameMasterError(
+            f"The server has stopped, but the world '{worldname}' is still not "
+            "playable. See the log file."
+        )
+
+    database = zomboid.secure_database(server, worldname)
+    if database is not None:
+        context.report(f"database closed to others: {database}")
+
+    context.report(f"world '{worldname}' initialised")
+
+
+def switch_world_command(server: zomboid.Server, arguments: argparse.Namespace) -> None:
+    """Let the service load another world."""
+    worldname = validate.parse_worldname(arguments.name)
+
+    playable, _created = zomboid.find_worlds(server.data_dir)
+    if worldname not in playable:
+        raise GameMasterError(
+            f"The world '{worldname}' is not playable. Create and initialise "
+            "it first, or run 'zomboid world list'."
+        )
+
+    require_unit(server)
+
+    if zomboid.find_running_server(server.server_user) is not None:
+        bring_down(server)
+
+    path = zomboid.install_unit(server, worldname)
+    context.report(f"service now loads '{worldname}': {path}")
+
+    bring_up(server)
+
+
+# -- players ----------------------------------------------------------------
+
+
+def _connection(server: zomboid.Server):
+    """Return an open connection to the running server of this user."""
+    running = zomboid.require_running(server)
+    return zomboid.rcon_for_world(server.data_dir, running.worldname)
+
+
+def list_players(server: zomboid.Server, _arguments: argparse.Namespace) -> None:
+    """List the players that are currently connected."""
+    with _connection(server) as connection:
+        print(connection.players(), flush=True)
+
+
+def kick_player(server: zomboid.Server, arguments: argparse.Namespace) -> None:
+    """Throw a player off the server."""
+    with _connection(server) as connection:
+        connection.kick_user(arguments.name, arguments.reason)
+    context.report(f"player '{arguments.name}' kicked")
+
+
+def ban_player(server: zomboid.Server, arguments: argparse.Namespace) -> None:
+    """Ban a player by name, optionally by network address as well."""
+    with _connection(server) as connection:
+        connection.ban_user(arguments.name, arguments.reason, arguments.with_address)
+    context.report(f"player '{arguments.name}' banned")
+
+
+def unban_player(server: zomboid.Server, arguments: argparse.Namespace) -> None:
+    """Lift the ban on a player name."""
+    with _connection(server) as connection:
+        connection.unban_user(arguments.name)
+    context.report(f"ban on '{arguments.name}' lifted")
+
+
+def ban_id(server: zomboid.Server, arguments: argparse.Namespace) -> None:
+    """Ban a Steam ID, which works while the player is offline."""
+    with _connection(server) as connection:
+        connection.ban_steam_id(arguments.steam_id)
+    context.report(f"Steam ID {arguments.steam_id} banned")
+
+
+def unban_id(server: zomboid.Server, arguments: argparse.Namespace) -> None:
+    """Lift the ban on a Steam ID."""
+    with _connection(server) as connection:
+        connection.unban_steam_id(arguments.steam_id)
+    context.report(f"ban on Steam ID {arguments.steam_id} lifted")
+
+
+def ban_address(server: zomboid.Server, arguments: argparse.Namespace) -> None:
+    """Ban a network address."""
+    with _connection(server) as connection:
+        connection.ban_address(arguments.address)
+    context.report(f"address {arguments.address} banned")
+
+
+def unban_address(server: zomboid.Server, arguments: argparse.Namespace) -> None:
+    """Lift the ban on a network address."""
+    with _connection(server) as connection:
+        connection.unban_address(arguments.address)
+    context.report(f"ban on address {arguments.address} lifted")
+
+
+def set_level(server: zomboid.Server, arguments: argparse.Namespace) -> None:
+    """Give a player one of the permission levels of the server."""
+    with _connection(server) as connection:
+        connection.set_access_level(arguments.name, arguments.level)
+    context.report(f"player '{arguments.name}' is now {arguments.level}")
+
+
+# -- options ----------------------------------------------------------------
+
+
+def list_options(server: zomboid.Server, _arguments: argparse.Namespace) -> None:
+    """Show all server options with their current values."""
+    with _connection(server) as connection:
+        print(connection.show_options(), flush=True)
+
+
+def set_option(server: zomboid.Server, arguments: argparse.Namespace) -> None:
+    """Change one server option while the server is running."""
+    with _connection(server) as connection:
+        connection.change_option(arguments.name, arguments.value)
+    context.report(f"option {arguments.name} set to {arguments.value}")
+
+
+def reload_options(server: zomboid.Server, _arguments: argparse.Namespace) -> None:
+    """Make the server read its configuration file again."""
+    with _connection(server) as connection:
+        connection.reload_options()
+    context.report("options reloaded")
+
+
+# ---------------------------------------------------------------------------
+# Command line
+# ---------------------------------------------------------------------------
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Describe the command line."""
+    parser = argparse.ArgumentParser(
+        prog="zomboid",
+        description="Run a Project Zomboid server.",
+    )
+    parser.add_argument(
+        "-u",
+        "--username",
+        metavar="USERNAME",
+        default=None,
+        help="user whose server is meant "
+             f"(default: {zomboid.DEFAULT_USER_KEY} from "
+             f"{context.GAMEMASTER_CONF_FILE})",
+    )
+
+    commands = parser.add_subparsers(dest="command", metavar="COMMAND")
+    commands.required = True
+
+    commands.add_parser("status", help="is a server running").set_defaults(
+        action=show_status)
+    commands.add_parser("start", help="start the service").set_defaults(
+        action=start_command)
+    commands.add_parser("stop", help="save the world and shut down").set_defaults(
+        action=stop_command)
+    commands.add_parser("save", help="save the world, keep the server up").set_defaults(
+        action=save_command)
+
+    message = commands.add_parser("message", help="send a message to every player")
+    message.add_argument("text", metavar="TEXT", help="the message")
+    message.set_defaults(action=message_command)
+
+    add_update_commands(commands)
+    add_world_commands(commands)
+    add_player_commands(commands)
+    add_option_commands(commands)
+
+    return parser
+
+
+def add_update_commands(commands) -> None:
+    """Describe 'zomboid update' and 'zomboid update mods'."""
+    update = commands.add_parser("update", help="update the server or its mods")
+    update.set_defaults(action=update_command)
+
+    actions = update.add_subparsers(dest="update_command", metavar="[mods]")
+
+    mods = actions.add_parser("mods", help="let the server fetch its mods again")
+    mods.add_argument(
+        "-c",
+        "--check",
+        dest="check_only",
+        action="store_true",
+        help="only ask whether an update is waiting, do not restart",
+    )
+    mods.set_defaults(action=update_mods_command)
+
+
+def add_world_commands(commands) -> None:
+    """Describe 'zomboid world ...'."""
+    world = commands.add_parser("world", help="the worlds of this server")
+    actions = world.add_subparsers(dest="world_command", metavar="ACTION")
+    actions.required = True
+
+    actions.add_parser("list", help="worlds and their state").set_defaults(
+        action=list_worlds_command)
+
+    create = actions.add_parser("create", help="create the files of a new world")
+    create.add_argument("name", metavar="NAME", help="name of the new world")
+    create.set_defaults(action=create_world_command)
+
+    init = actions.add_parser("init", help="first start, then write the service")
+    init.add_argument("name", metavar="NAME", help="name of the world")
+    init.set_defaults(action=init_world_command)
+
+    switch = actions.add_parser("switch", help="let the service load another world")
+    switch.add_argument("name", metavar="NAME", help="name of the world")
+    switch.set_defaults(action=switch_world_command)
+
+
+def add_player_commands(commands) -> None:
+    """Describe 'zomboid player ...'."""
+    player = commands.add_parser("player", help="the players on this server")
+    actions = player.add_subparsers(dest="player_command", metavar="ACTION")
+    actions.required = True
+
+    actions.add_parser("list", help="players that are connected").set_defaults(
+        action=list_players)
+
+    kick = actions.add_parser("kick", help="throw a player off the server")
+    kick.add_argument("name", metavar="NAME", help="name of the player")
+    kick.add_argument("-r", "--reason", default=None, help="reason, shown to the player")
+    kick.set_defaults(action=kick_player)
+
+    ban = actions.add_parser("ban", help="ban a player by name")
+    ban.add_argument("name", metavar="NAME", help="name of the player")
+    ban.add_argument("-r", "--reason", default=None, help="reason, shown to the player")
+    ban.add_argument("--ip", dest="with_address", action="store_true",
+                     help="ban the network address as well")
+    ban.set_defaults(action=ban_player)
+
+    unban = actions.add_parser("unban", help="lift the ban on a name")
+    unban.add_argument("name", metavar="NAME", help="name of the player")
+    unban.set_defaults(action=unban_player)
+
+    ban_steam = actions.add_parser("banid", help="ban a Steam ID")
+    ban_steam.add_argument("steam_id", metavar="STEAMID", help="the Steam ID")
+    ban_steam.set_defaults(action=ban_id)
+
+    unban_steam = actions.add_parser("unbanid", help="lift the ban on a Steam ID")
+    unban_steam.add_argument("steam_id", metavar="STEAMID", help="the Steam ID")
+    unban_steam.set_defaults(action=unban_id)
+
+    ban_net = actions.add_parser("banip", help="ban a network address")
+    ban_net.add_argument("address", metavar="ADDRESS", help="the network address")
+    ban_net.set_defaults(action=ban_address)
+
+    unban_net = actions.add_parser("unbanip", help="lift the ban on an address")
+    unban_net.add_argument("address", metavar="ADDRESS", help="the network address")
+    unban_net.set_defaults(action=unban_address)
+
+    level = actions.add_parser("level", help="give a player a permission level")
+    level.add_argument("name", metavar="NAME", help="name of the player")
+    level.add_argument("level", metavar="LEVEL", choices=zomboid.ACCESS_LEVELS,
+                       help=f"one of: {', '.join(zomboid.ACCESS_LEVELS)}")
+    level.set_defaults(action=set_level)
+
+
+def add_option_commands(commands) -> None:
+    """Describe 'zomboid option ...'."""
+    option = commands.add_parser("option", help="the settings of this server")
+    actions = option.add_subparsers(dest="option_command", metavar="ACTION")
+    actions.required = True
+
+    actions.add_parser("list", help="all options with their values").set_defaults(
+        action=list_options)
+
+    setting = actions.add_parser("set", help="change one option")
+    setting.add_argument("name", metavar="NAME", help="name of the option")
+    setting.add_argument("value", metavar="VALUE", help="the new value")
+    setting.set_defaults(action=set_option)
+
+    actions.add_parser("reload", help="read the ini file again").set_defaults(
+        action=reload_options)
+
+
+def main() -> int:
+    """Start of the program. Returns the exit code (0 = everything ok)."""
+    arguments = build_parser().parse_args()
+
+    def carry_out() -> None:
+        context.require_root()
+        server = zomboid.load(arguments.username)
+        arguments.action(server, arguments)
+
+    return context.run(carry_out)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

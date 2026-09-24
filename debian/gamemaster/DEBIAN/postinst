@@ -1,0 +1,24 @@
+#!/bin/sh
+# Prepare what every GameMaster program expects to find.
+set -e
+
+AGENT_USER=gamemaster
+AGENT_HOME=/var/lib/gamemaster
+
+case "$1" in
+    configure)
+        # The user an AI agent connects as. It needs a shell and a home of
+        # its own, because its key goes into ~/.ssh/authorized_keys.
+        if ! getent passwd "$AGENT_USER" >/dev/null; then
+            adduser --system --group \
+                    --home "$AGENT_HOME" \
+                    --shell /bin/bash \
+                    --gecos "GameMaster agent" \
+                    "$AGENT_USER"
+        fi
+        ;;
+esac
+
+
+
+exit 0

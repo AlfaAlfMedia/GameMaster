@@ -1,0 +1,10 @@
+# Allow the user gamemaster to run selected GameMaster scripts as root.
+# Every script must be listed here explicitly with its full path.
+# Do not use wildcards and do not allow whole directories.
+#
+# These are exactly the actions an AI agent, connecting as the user
+# gamemaster, is allowed to perform.
+
+Cmnd_Alias GAMEMASTER_COMMANDS = /usr/sbin/zomboid
+
+gamemaster ALL=(root) NOPASSWD: GAMEMASTER_COMMANDS

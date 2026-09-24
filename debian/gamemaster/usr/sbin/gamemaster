@@ -1,0 +1,707 @@
+#!/usr/bin/python3
+"""gamemaster - administration tool for GameMaster. Must be run as root.
+
+Usage:
+    gamemaster add zomboid [-u|--username USERNAME] [-d|--installdir DIRECTORY]
+                           [-P|--port PORT] [-U|--udp-port PORT]
+                           [-R|--rcon-port PORT]
+    gamemaster install zomboid [-u|--username USERNAME]
+                               [-d|--installdir DIRECTORY]
+                               [-P|--port PORT] [-U|--udp-port PORT]
+                               [-R|--rcon-port PORT] [-b|--beta BRANCH]
+    gamemaster agent [-l|--list]
+    gamemaster -h | --help
+
+"add zomboid" registers an EXISTING Project Zomboid server with GameMaster.
+It does not create the Linux user and it does not install the server. It
+only writes the file /etc/gamemaster/zomboid/USERNAME.conf.
+
+"install zomboid" installs a Project Zomboid server with SteamCMD and then
+registers it like "add zomboid". The Linux user is created if it does not
+exist; its password is asked for. SteamCMD itself must already be installed.
+
+The ports are taken from the template unless they are given. A port that
+another server already uses is refused; without the matching option the
+program then offers the next free one.
+"""
+
+import argparse
+import getpass
+import grp
+import pwd
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+from gamemaster import configfile, context, sshkey, steamcmd, validate
+from gamemaster.errors import GameMasterError
+
+ZOMBOID_ETC_DIR = context.ETC_DIR / "zomboid"
+GAMEMASTER_CONF_FILE = context.GAMEMASTER_CONF_FILE
+
+ZOMBOID_TEMPLATE_FILE = Path("/usr/share/gamemaster/zomboid/template.conf")
+
+SERVER_SCRIPT = "start-server.sh"
+
+LOGIN_SHELL = "/bin/bash"
+
+# Settings that hold a port, in the order they are asked for, with the name
+# of the option that sets each of them
+PORT_SETTINGS = {
+    "PZ_SERVER_PORT": "--port",
+    "PZ_UDP_PORT": "--udp-port",
+    "PZ_RCON_PORT": "--rcon-port",
+}
+
+
+def user_exists(username: str) -> bool:
+    """Say whether the Linux user exists."""
+    try:
+        pwd.getpwnam(username)
+    except KeyError:
+        return False
+    return True
+
+
+def check_username(username: str) -> str:
+    """Return the name of an existing Linux user."""
+    # The form is checked by the library, the existence by the system
+    username = validate.parse_username(username)
+    if not user_exists(username):
+        raise GameMasterError(
+            f"The Linux user '{username}' does not exist. "
+            f"'gamemaster install zomboid' creates the user and installs "
+            f"the server."
+        )
+    return username
+
+
+def has_server(install_dir: str) -> bool:
+    """Say whether a Project Zomboid server is installed in the directory."""
+    return (Path(install_dir) / SERVER_SCRIPT).is_file()
+
+
+def check_install_dir(install_dir: str) -> str:
+    """Return the directory of an installed Project Zomboid server."""
+    install_dir = validate.parse_install_dir(install_dir)
+    if not has_server(install_dir):
+        raise GameMasterError(
+            f"No Project Zomboid server found in {install_dir} "
+            f"({SERVER_SCRIPT} is missing)."
+        )
+    return install_dir
+
+
+def get_default_username(settings: dict[str, str]) -> str:
+    """Return PZ_DEFAULT_USER from /etc/gamemaster/gamemaster.conf."""
+    username = settings.get("PZ_DEFAULT_USER")
+    if not username:
+        raise GameMasterError(
+            f"No user given and PZ_DEFAULT_USER is not set in "
+            f"{GAMEMASTER_CONF_FILE}. Use -u/--username to name a user."
+        )
+    return username
+
+
+def get_setting(settings: dict[str, str], key: str) -> str:
+    """Return a setting from /etc/gamemaster/gamemaster.conf that must be there."""
+    return configfile.require(settings, key, str(GAMEMASTER_CONF_FILE))
+
+
+def get_default_install_dir(template: str) -> str:
+    """Return PZ_SERVER_INSTALL_DIR from the template."""
+    return configfile.require(
+        configfile.read_values(template),
+        "PZ_SERVER_INSTALL_DIR",
+        str(ZOMBOID_TEMPLATE_FILE),
+    )
+
+
+def open_home_to_group(username: str) -> None:
+    """Let the group of the server user enter its home directory.
+
+    The worlds and the logs of a server live below its home directory, and
+    the agent reads them as a member of that user's group. A home that only
+    its owner may enter would make every one of those files unreachable, no
+    matter what the files themselves allow.
+    """
+    home = Path(pwd.getpwnam(username).pw_dir)
+
+    try:
+        mode = home.stat().st_mode & 0o777
+    except OSError as error:
+        raise GameMasterError(f"Could not look at {home}: {error}") from error
+
+    # Group needs r-x: x to enter the directory, r to list what is in it
+    wanted = mode | 0o050
+    if wanted == mode:
+        return
+
+    try:
+        home.chmod(wanted)
+    except OSError as error:
+        raise GameMasterError(
+            f"Could not open {home} to the group '{username}': {error}"
+        ) from error
+
+    print(f"Opened {home} to the group '{username}' (now {wanted:04o}).")
+
+
+def add_user_to_group(username: str, group: str) -> None:
+    """Put the user into the group, unless it is a member already."""
+    if username in grp.getgrnam(group).gr_mem:
+        return
+
+    try:
+        subprocess.run(["usermod", "-aG", group, username], check=True)
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise GameMasterError(
+            f"Could not add '{username}' to the group '{group}': {error}"
+        ) from error
+
+    print(f"Added the user '{username}' to the group '{group}'.")
+
+
+def get_agent_user(settings: dict[str, str]) -> str:
+    """Return GM_AGENT_USER, the user an AI agent connects as."""
+    return validate.parse_username(get_setting(settings, "GM_AGENT_USER"))
+
+
+def add_agent_to_group(username: str, agent: str) -> None:
+    """Put the agent user into the group of the server user."""
+    # As a member of the group of the server user, the agent may read the
+    # files of that server
+
+    if not user_exists(agent):
+        print(
+            f"Note: the user '{agent}' does not exist, so it was not added to "
+            f"the group '{username}'.",
+            file=sys.stderr,
+        )
+        return
+
+    add_user_to_group(agent, username)
+
+
+# ---------------------------------------------------------------------------
+# Ports
+# ---------------------------------------------------------------------------
+
+
+def used_ports() -> dict[int, str]:
+    """Return every port that is taken, with the user it belongs to."""
+    taken: dict[int, str] = {}
+
+    if not ZOMBOID_ETC_DIR.is_dir():
+        return taken
+
+    for conf_file in sorted(ZOMBOID_ETC_DIR.glob("*.conf")):
+        settings = context.read_settings(conf_file)
+        for key in PORT_SETTINGS:
+            value = settings.get(key, "")
+            if value.isdigit():
+                taken.setdefault(int(value), conf_file.stem)
+
+    return taken
+
+
+def next_free_port(after: int, taken: dict[int, str]) -> int:
+    """Return the first free port from this one upwards."""
+    port = after
+    while port in taken:
+        port += 1
+    if port > validate.MAXIMUM_PORT:
+        raise GameMasterError("No free port left.")
+    return port
+
+
+def ask_for_port(key: str, suggestion: int, taken: dict[int, str]) -> int:
+    """Ask the administrator for a port, offering the suggestion."""
+    while True:
+        answer = input(f"{key}: port for this server [{suggestion}]: ").strip()
+        if not answer:
+            return suggestion
+        try:
+            port = validate.parse_port(answer, key)
+        except GameMasterError as error:
+            print(error, file=sys.stderr)
+            continue
+        if port in taken:
+            print(f"Port {port} is already used by '{taken[port]}'.", file=sys.stderr)
+            continue
+        return port
+
+
+def choose_port(
+    key: str, given: str | None, default: str, taken: dict[int, str]
+) -> int:
+    """Return the port for one setting: from the option, the template or a dialog."""
+    if given is not None:
+        port = validate.parse_port(given, key)
+        if port in taken:
+            raise GameMasterError(
+                f"Port {port} is already used by '{taken[port]}'."
+            )
+        return port
+
+    port = validate.parse_port(default, key)
+    if port not in taken:
+        return port
+
+    suggestion = next_free_port(port + 1, taken)
+
+    if not sys.stdin.isatty():
+        raise GameMasterError(
+            f"Port {port} from the template is already used by '{taken[port]}'. "
+            f"Use {PORT_SETTINGS[key]} to choose one, for example {suggestion}."
+        )
+
+    print(f"Port {port} is already used by '{taken[port]}'.")
+    return ask_for_port(key, suggestion, taken)
+
+
+def choose_ports(template: str, arguments: argparse.Namespace) -> dict[str, int]:
+    """Return a port for every port setting, free of collisions."""
+    defaults = configfile.read_values(template)
+    given = {
+        "PZ_SERVER_PORT": arguments.port,
+        "PZ_UDP_PORT": arguments.udp_port,
+        "PZ_RCON_PORT": arguments.rcon_port,
+    }
+    taken = used_ports()
+    chosen: dict[str, int] = {}
+
+    for key in PORT_SETTINGS:
+        port = choose_port(
+            key, given[key], configfile.require(defaults, key, str(ZOMBOID_TEMPLATE_FILE)), taken
+        )
+        # A port chosen now must not be offered again in this same run
+        taken[port] = "this server"
+        chosen[key] = port
+
+    return chosen
+
+
+# ---------------------------------------------------------------------------
+# Writing the configuration
+# ---------------------------------------------------------------------------
+
+
+def check_not_registered(username: str) -> None:
+    """End with an error if the user has a configuration file already."""
+    conf_file = ZOMBOID_ETC_DIR / f"{username}.conf"
+    if conf_file.exists():
+        raise GameMasterError(
+            f"{conf_file} already exists. The user '{username}' is already registered."
+        )
+
+
+def write_zomboid_config(
+    template: str,
+    username: str,
+    install_dir: str,
+    branch: str,
+    ports: dict[str, int],
+) -> None:
+    """Create /etc/gamemaster/zomboid/USERNAME.conf from the template."""
+    conf_file = ZOMBOID_ETC_DIR / f"{username}.conf"
+
+    content = configfile.set_value(template, "PZ_SERVER_INSTALL_DIR", install_dir)
+    content = configfile.set_value(content, "PZ_SERVER_USER", username)
+    content = configfile.set_value(content, "PZ_SERVER_BRANCH", branch)
+    for key, port in ports.items():
+        content = configfile.set_value(content, key, str(port))
+
+    try:
+        ZOMBOID_ETC_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        raise GameMasterError(f"Could not create {ZOMBOID_ETC_DIR}: {error}") from error
+
+    # Mode 'x' creates the file and fails if it already exists
+    try:
+        with open(conf_file, "x", encoding="utf-8") as new_file:
+            new_file.write(content)
+    except FileExistsError:
+        raise GameMasterError(
+            f"{conf_file} already exists. The user '{username}' is already registered."
+        ) from None
+    except OSError as error:
+        raise GameMasterError(f"Could not write {conf_file}: {error}") from error
+
+    try:
+        conf_file.chmod(0o600)
+    except OSError as error:
+        raise GameMasterError(
+            f"Could not set the permissions of {conf_file}: {error}"
+        ) from error
+
+    print(f"Registered the Zomboid server of user '{username}'.")
+    print(f"Configuration file: {conf_file}")
+    for key, port in ports.items():
+        print(f"  {key}={port}")
+
+
+def register_zomboid(
+    agent: str,
+    template: str,
+    username: str,
+    install_dir: str,
+    branch: str,
+    ports: dict[str, int],
+) -> None:
+    """Write the configuration of the server and let the agent read its files."""
+    write_zomboid_config(template, username, install_dir, branch, ports)
+    open_home_to_group(username)
+    add_agent_to_group(username, agent)
+
+
+# ---------------------------------------------------------------------------
+# Installing
+# ---------------------------------------------------------------------------
+
+
+def check_install_target(install_dir: str, username: str, exists: bool) -> None:
+    """End with an error if the server cannot be installed into the directory."""
+    if has_server(install_dir):
+        raise GameMasterError(
+            f"There is a Project Zomboid server in {install_dir} already. "
+            f"Use 'gamemaster add zomboid' to register it."
+        )
+
+    directory = Path(install_dir)
+    if not directory.exists():
+        return
+
+    if not directory.is_dir():
+        raise GameMasterError(f"{install_dir} exists and is not a directory.")
+
+    owner = pwd.getpwuid(directory.stat().st_uid).pw_name
+    if not exists or owner != username:
+        raise GameMasterError(
+            f"{install_dir} already exists and belongs to '{owner}'. "
+            f"Use -d/--installdir to choose another directory."
+        )
+
+
+def ask_for_password(username: str) -> str:
+    """Ask twice for the password of a new user and return it."""
+    if not sys.stdin.isatty():
+        raise GameMasterError(
+            f"The user '{username}' does not exist and has to be created, "
+            f"which needs a password. Run the command in a terminal."
+        )
+
+    while True:
+        password = getpass.getpass(f"Password for the new user '{username}': ")
+        if not password:
+            print("The password must not be empty.", file=sys.stderr)
+            continue
+        if password != getpass.getpass("Repeat the password: "):
+            print("The passwords do not match.", file=sys.stderr)
+            continue
+        return password
+
+
+def create_user(username: str, password: str) -> None:
+    """Create the Linux user with a home directory and a group of its own."""
+    try:
+        subprocess.run(
+            [
+                "useradd",
+                "--create-home",
+                "--user-group",
+                "--shell", LOGIN_SHELL,
+                username,
+            ],
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise GameMasterError(f"Could not create the user '{username}': {error}") from error
+
+    # chpasswd reads the password from standard input, so it never shows up
+    # in the list of processes
+    try:
+        subprocess.run(
+            ["chpasswd"], input=f"{username}:{password}\n", text=True, check=True
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise GameMasterError(
+            f"Could not set the password of '{username}': {error}"
+        ) from error
+
+    print(f"Created the user '{username}'.")
+
+
+def prepare_install_dir(install_dir: str, username: str) -> None:
+    """Create the install directory and hand it to the server user."""
+    directory = Path(install_dir)
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        shutil.chown(directory, user=username, group=username)
+        directory.chmod(0o755)
+    except (OSError, LookupError) as error:
+        raise GameMasterError(f"Could not prepare {install_dir}: {error}") from error
+
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+
+
+def add_zomboid(arguments: argparse.Namespace) -> None:
+    """gamemaster add zomboid [options]"""
+    settings = context.read_settings(GAMEMASTER_CONF_FILE)
+    template = context.read_template(ZOMBOID_TEMPLATE_FILE)
+    username = check_username(arguments.username or get_default_username(settings))
+    install_dir = check_install_dir(
+        arguments.installdir or get_default_install_dir(template)
+    )
+    branch = validate.parse_branch(get_setting(settings, "PZ_DEFAULT_BRANCH"))
+    agent = get_agent_user(settings)
+    check_not_registered(username)
+
+    ports = choose_ports(template, arguments)
+
+    register_zomboid(agent, template, username, install_dir, branch, ports)
+
+
+def install_zomboid(arguments: argparse.Namespace) -> None:
+    """gamemaster install zomboid [options]"""
+    settings = context.read_settings(GAMEMASTER_CONF_FILE)
+    template = context.read_template(ZOMBOID_TEMPLATE_FILE)
+    username = validate.parse_username(
+        arguments.username or get_default_username(settings)
+    )
+    install_dir = validate.parse_install_dir(
+        arguments.installdir or get_default_install_dir(template)
+    )
+    app_id = validate.parse_app_id(get_setting(settings, "PZ_APP_ID"))
+    branch = validate.parse_branch(
+        arguments.beta or get_setting(settings, "PZ_DEFAULT_BRANCH")
+    )
+    agent = get_agent_user(settings)
+
+    # Before anything is created: without SteamCMD nothing can be installed
+    steamcmd.find()
+    check_not_registered(username)
+    exists = user_exists(username)
+    check_install_target(install_dir, username, exists)
+
+    ports = choose_ports(template, arguments)
+
+    if not exists:
+        create_user(username, ask_for_password(username))
+
+    prepare_install_dir(install_dir, username)
+
+    print(f"Installing the Project Zomboid server into {install_dir} "
+          f"(branch '{branch}') ...", flush=True)
+    steamcmd.update(app_id, username, install_dir, branch)
+
+    # SteamCMD does not always report a failed download in its exit code
+    if not has_server(install_dir):
+        raise GameMasterError(
+            f"SteamCMD finished, but there is no {SERVER_SCRIPT} in "
+            f"{install_dir}."
+        )
+
+    register_zomboid(agent, template, username, install_dir, branch, ports)
+
+    print(
+        f"The passwords in {ZOMBOID_ETC_DIR / (username + '.conf')} are still "
+        f"the ones from the template. Change them before creating the first world."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Command line
+# ---------------------------------------------------------------------------
+
+
+def add_server_options(parser: argparse.ArgumentParser) -> None:
+    """Add the options that describe a Project Zomboid server."""
+    parser.add_argument(
+        "-u",
+        "--username",
+        metavar="USERNAME",
+        default=None,
+        help=f"Linux user that runs the server "
+             f"(default: PZ_DEFAULT_USER from {GAMEMASTER_CONF_FILE})",
+    )
+    parser.add_argument(
+        "-d",
+        "--installdir",
+        metavar="DIRECTORY",
+        default=None,
+        help=f"directory of the server "
+             f"(default: PZ_SERVER_INSTALL_DIR from {ZOMBOID_TEMPLATE_FILE})",
+    )
+    parser.add_argument(
+        "-P",
+        "--port",
+        metavar="PORT",
+        default=None,
+        help="udp port the players connect to (default: from the template)",
+    )
+    parser.add_argument(
+        "-U",
+        "--udp-port",
+        metavar="PORT",
+        default=None,
+        help="second udp port of the server (default: from the template)",
+    )
+    parser.add_argument(
+        "-R",
+        "--rcon-port",
+        metavar="PORT",
+        default=None,
+        help="port of the remote console (default: from the template)",
+    )
+
+
+# ---------------------------------------------------------------------------
+# The agent user
+# ---------------------------------------------------------------------------
+
+
+def show_agent_keys(agent: str) -> list[sshkey.PublicKey]:
+    """List the keys that may log in as the agent user, and return them."""
+    keys = sshkey.read_keys(agent)
+    path = sshkey.authorized_keys_file(agent)
+
+    print(f"Agent user:      {agent}")
+    print(f"Keys are kept in {path}")
+
+    if not keys:
+        print("There is no key yet, so the agent cannot log in.")
+        return keys
+
+    print(f"\n{len(keys)} key(s) may log in as '{agent}':")
+    for number, key in enumerate(keys, start=1):
+        comment = key.comment or "(no comment)"
+        print(f"  {number}) {key.type:<12} {key.fingerprint}  {comment}")
+
+    return keys
+
+
+def ask_for_key() -> sshkey.PublicKey | None:
+    """Ask for a public key and return it, or None if none was given."""
+    print(
+        "\nPaste the public key of the agent - one line, as it stands in its "
+        ".pub file.\nLeave empty to add nothing."
+    )
+
+    while True:
+        text = input("Key: ").strip()
+        if not text:
+            return None
+        try:
+            return sshkey.parse(text)
+        except sshkey.SshKeyError as error:
+            print(f"That is not a usable key: {error}")
+
+
+def agent(arguments: argparse.Namespace) -> None:
+    """gamemaster agent [--list]"""
+    settings = context.read_settings(GAMEMASTER_CONF_FILE)
+    name = get_agent_user(settings)
+
+    try:
+        pwd.getpwnam(name)
+    except KeyError:
+        raise GameMasterError(
+            f"The agent user '{name}' does not exist. The GameMaster package "
+            f"creates it; check {GAMEMASTER_CONF_FILE} if it is named "
+            f"differently here."
+        ) from None
+
+    show_agent_keys(name)
+
+    if arguments.list_only:
+        return
+
+    if not sys.stdin.isatty():
+        print("\nNo terminal, so no key is asked for.")
+        return
+
+    answer = input("\nIs the key of the agent among them? [y/N] ").strip().lower()
+    if answer in ("y", "yes", "j", "ja"):
+        return
+
+    key = ask_for_key()
+    if key is None:
+        print("Nothing added.")
+        return
+
+    path = sshkey.add_key(name, key)
+    print(f"Added {key.fingerprint} to {path}")
+    print(f"The agent can now log in as '{name}' with that key.")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Describe the command line: commands, games, options."""
+    parser = argparse.ArgumentParser(
+        prog="gamemaster",
+        description="Administration tool for GameMaster.",
+    )
+    commands = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
+
+    add_parser = commands.add_parser("add", help="register an existing game server")
+    add_games = add_parser.add_subparsers(dest="game", required=True, metavar="GAME")
+    add_zomboid_parser = add_games.add_parser(
+        "zomboid", help="register a Project Zomboid server"
+    )
+    add_server_options(add_zomboid_parser)
+
+    install_parser = commands.add_parser(
+        "install", help="install a game server and register it"
+    )
+    install_games = install_parser.add_subparsers(
+        dest="game", required=True, metavar="GAME"
+    )
+    install_zomboid_parser = install_games.add_parser(
+        "zomboid", help="install a Project Zomboid server"
+    )
+    add_server_options(install_zomboid_parser)
+    install_zomboid_parser.add_argument(
+        "-b",
+        "--beta",
+        metavar="BRANCH",
+        default=None,
+        help=f"install this beta branch "
+             f"(default: PZ_DEFAULT_BRANCH from {GAMEMASTER_CONF_FILE})",
+    )
+
+    agent_parser = commands.add_parser(
+        "agent", help="the keys the agent user may log in with"
+    )
+    agent_parser.add_argument(
+        "-l",
+        "--list",
+        dest="list_only",
+        action="store_true",
+        help="only show the keys, do not ask for one",
+    )
+
+    return parser
+
+
+def main() -> int:
+    """Start of the program. Returns the exit code (0 = everything ok)."""
+    arguments = build_parser().parse_args()
+
+    def carry_out() -> None:
+        context.require_root()
+        if arguments.command == "add" and arguments.game == "zomboid":
+            add_zomboid(arguments)
+        elif arguments.command == "install" and arguments.game == "zomboid":
+            install_zomboid(arguments)
+        elif arguments.command == "agent":
+            agent(arguments)
+
+    return context.run(carry_out)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

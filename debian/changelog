@@ -1,6 +1,6 @@
-gamemaster (0.1.0) unstable; urgency=medium
+gamemaster (0.1.5) unstable; urgency=medium
 
   * First package. Sets a machine up with 'gamemaster' and runs Project
     Zomboid servers with 'zomboid'.
 
- -- AlfaAlf <git@alfaalf-media.de>  Wed, 23 Sep 2026 20:00:00 +0200
+ -- AlfaAlf <git@alfaalf-media.de>  Wed, 24 Sep 2026 22:15:00 +0200
