@@ -18,15 +18,20 @@ world - everything is written below ~/Zomboid.
     zomboid save                      save the world, keep the server up
     zomboid message "TEXT"            send a message to every player
     zomboid update                    update the server with SteamCMD
-    zomboid update mods               let the server fetch its mods again
+    zomboid update mods [-c|--check]  let the server fetch its mods again
 
     zomboid world list                worlds of this server and their state
     zomboid world create NAME         create ini, sandbox file and save dir
     zomboid world init NAME           first start, then write the service
     zomboid world switch NAME         let the service load another world
 
-    zomboid player list | kick | ban | unban | banid | unbanid | banip
-                        | unbanip | level
+    zomboid player list
+    zomboid player kick NAME [-r|--reason TEXT]
+    zomboid player ban NAME [-r|--reason TEXT] [--ip]
+    zomboid player unban NAME
+    zomboid player banid STEAMID | unbanid STEAMID
+    zomboid player banip ADDRESS | unbanip ADDRESS
+    zomboid player level NAME LEVEL
     zomboid option list | set | reload
 
 Creating a world takes three steps, and the middle one is yours:
@@ -618,6 +623,7 @@ def add_update_commands(commands) -> None:
 
     mods = actions.add_parser("mods", help="let the server fetch its mods again")
     mods.add_argument(
+        "-c",
         "--check",
         dest="check_only",
         action="store_true",

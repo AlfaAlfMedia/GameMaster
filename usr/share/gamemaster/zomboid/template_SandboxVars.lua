@@ -1,1020 +1,753 @@
 SandboxVars = {
     VERSION = 6,
-    -- Dies ändert den \Bevölkerungsdichte Multiplikator\ unter Bevölkerung (erweitert). Standard=Normal
-    -- 1 = Verrückt
-    -- 2 = Sehr Viele
-    -- 3 = Viele
-    -- 4 = Normal
-    -- 5 = Wenige
-    -- 6 = Keine
+    -- Population multiplier, the same value as 'Population Multiplier' in the advanced
+    -- population settings. Default=Normal
+    -- 1 = Insane, 2 = Very high, 3 = High, 4 = Normal, 5 = Low, 6 = None
     Zombies = 4,
-    -- Steuert, wie Zombies auf der Karte verteilt werden. Standard=Mehr in Städten
-    -- 1 = Mehr in Städten
-    -- 2 = Gleichmäßig
+    -- How zombies are spread across the map. Default=Urban focused
+    -- 1 = Urban focused, 2 = Uniform
     Distribution = 1,
-    -- Controls whether some randomization is applied to zombie distribution.
+    -- Applies some randomisation to the zombie distribution.
     ZombieVoronoiNoise = true,
-    -- Damit die Zombies wiederkehren, muss die Zone für den ausgewählten Zeitpunkt ungesehen sein. Standard=Keine
-    -- 1 = Oft
-    -- 2 = Normal
-    -- 3 = Selten
-    -- 4 = Keine
+    -- How often zombies return. The zone must stay unseen for the chosen period.
+    -- Default=None
+    -- 1 = Often, 2 = Normal, 3 = Rare, 4 = None
     ZombieRespawn = 4,
-    -- Zombies wird erlaubt, in leere Zellen einzuwandern.
+    -- Allow zombies to migrate into empty cells.
     ZombieMigrate = true,
-    -- Standard=1 Stunde, 30 Minuten
-    -- 1 = 15 Minuten
-    -- 2 = 30 Minuten
-    -- 3 = 1 Stunde
-    -- 4 = 1 Stunde, 30 Minuten
-    -- 5 = 2 Stunden
-    -- 6 = 3 Stunden
-    -- 7 = 4 Stunden
-    -- 8 = 5 Stunden
-    -- 9 = 12 Stunden
-    -- 10 = Echtzeit
-    -- 11 = 8 stunden
-    -- 12 = 9 stunden
-    -- 13 = 10 stunden
-    -- 14 = 11 stunden
-    -- 15 = 12 stunden
-    -- 16 = 13 stunden
-    -- 17 = 14 stunden
-    -- 18 = 15 stunden
-    -- 19 = 16 stunden
-    -- 20 = 17 stunden
-    -- 21 = 18 stunden
-    -- 22 = 19 stunden
-    -- 23 = 20 stunden
-    -- 24 = 21 stunden
-    -- 25 = 22 stunden
-    -- 26 = 23 stunden
-    -- 27 = Echtzeit
+    -- Length of one in-game day. Default=1 hour 30 minutes
+    -- 1 = 15 min, 2 = 30 min, 3 = 1 h, 4 = 1 h 30, 5 = 2 h, 6 = 3 h, 7 = 4 h, 8 = 5 h,
+    -- 9 = 12 h, 10 = real time, 11 = 8 h, 12 = 9 h, 13 = 10 h, 14 = 11 h, 15 = 12 h,
+    -- 16 = 13 h, 17 = 14 h, 18 = 15 h, 19 = 16 h, 20 = 17 h, 21 = 18 h, 22 = 19 h,
+    -- 23 = 20 h, 24 = 21 h, 25 = 22 h, 26 = 23 h, 27 = real time
     DayLength = 4,
     StartYear = 1,
-    -- Monat, in dem das Spiel beginnt. Standard=Juli
-    -- 1 = Januar
-    -- 2 = Februar
-    -- 3 = März
-    -- 4 = April
-    -- 5 = Mai
-    -- 6 = Juni
-    -- 7 = Juli
-    -- 8 = August
-    -- 9 = September
-    -- 10 = Oktober
-    -- 11 = November
-    -- 12 = Dezember
+    -- Month the game starts in. Default=July
+    -- 1 = January, 2 = February, 3 = March, 4 = April, 5 = May, 6 = June, 7 = July,
+    -- 8 = August, 9 = September, 10 = October, 11 = November, 12 = December
     StartMonth = 7,
-    -- Tag des Monats, an dem das Spiel beginnt.
+    -- Day of the month the game starts on.
     StartDay = 9,
-    -- Stunde des Tages, an dem Spiel beginnt. Standard=9 Uhr
-    -- 1 = 7 Uhr
-    -- 2 = 9 Uhr
-    -- 3 = 12 Uhr
-    -- 4 = 13 Uhr
-    -- 5 = 15 Uhr
-    -- 6 = 21 Uhr
-    -- 7 = 0 Uhr
-    -- 8 = 2 Uhr
-    -- 9 = 5 Uhr
+    -- Hour of the day the game starts at. Default=9 AM
+    -- 1 = 7 AM, 2 = 9 AM, 3 = 12 PM, 4 = 1 PM, 5 = 3 PM, 6 = 9 PM, 7 = 12 AM,
+    -- 8 = 2 AM, 9 = 5 AM
     StartTime = 2,
-    -- Whether the time of day changes naturally, or it's always day/night. Standard=Normal
-    -- 1 = Normal
-    -- 2 = Endless Day
-    -- 3 = Endless Night
+    -- Whether the time of day changes naturally or stays fixed. Default=Normal
+    -- 1 = Normal, 2 = Endless day, 3 = Endless night
     DayNightCycle = 1,
-    -- Whether weather changes or remains at a single state. Standard=Normal
-    -- 1 = Normal
-    -- 2 = No Weather
-    -- 3 = Endless Rain
-    -- 4 = Endless Storm
-    -- 5 = Endless Snow
-    -- 6 = Endless Blizzard
+    -- Whether weather changes or stays in a single state. Default=Normal
+    -- 1 = Normal, 2 = No weather, 3 = Endless rain, 4 = Endless storm,
+    -- 5 = Endless snow, 6 = Endless blizzard
     ClimateCycle = 1,
-    -- Whether fog occurs naturally, never occurs, or is always present. Standard=Normal
-    -- 1 = Normal
-    -- 2 = No Fog
-    -- 3 = Endless Fog
+    -- Whether fog occurs naturally, never, or always. Default=Normal
+    -- 1 = Normal, 2 = No fog, 3 = Endless fog
     FogCycle = 1,
-    -- Lege fest, wie lange nach dem Standard-Startdatum (9. Juli 1993) Sanitäranlagen (z.B. Waschbecken) aufhören sollen, unendlichen Wasserquellen zu sein. Standard=0-30 Tage
-    -- 1 = Sofort
-    -- 2 = 0-30 Tage
-    -- 3 = 0-2 Monate
-    -- 4 = 0-6 Monate
-    -- 5 = 0-1 Jahr
-    -- 6 = 0-5 Jahre
-    -- 7 = 2-6 Monate
-    -- 8 = 6-12 Monate
-    -- 9 = Deaktiviert
+    -- How long after the default start date (9 July 1993) taps stop being an infinite
+    -- water source. Default=0-30 days
+    -- 1 = Instant, 2 = 0-30 days, 3 = 0-2 months, 4 = 0-6 months, 5 = 0-1 year,
+    -- 6 = 0-5 years, 7 = 2-6 months, 8 = 6-12 months, 9 = Disabled
     WaterShut = 2,
-    -- Lege fest, wie lange nach dem Standard-Startdatum (9. Juli 1993) der Strom endgültig abgeschaltet wird. Standard=14 - 30 Days
-    -- 1 = Instant
-    -- 2 = 14 - 30 Days
-    -- 3 = 14 Days - 2 Months
-    -- 4 = 14 Days - 6 Months
-    -- 5 = 14 Days - 1 Year
-    -- 6 = 14 Days - 5 Years
-    -- 7 = 2 - 6 Months
-    -- 8 = 6 - 12 Months
+    -- How long after the default start date (9 July 1993) the power is cut for good.
+    -- Default=14-30 days
+    -- 1 = Instant, 2 = 14-30 days, 3 = 14 days - 2 months, 4 = 14 days - 6 months,
+    -- 5 = 14 days - 1 year, 6 = 14 days - 5 years, 7 = 2-6 months, 8 = 6-12 months,
     -- 9 = Disabled
     ElecShut = 2,
-    -- Steuert, wie lange Alarmbatterien halten, nachdem der Strom abgeschaltet wird. Standard=0-30 Tage
-    -- 1 = Sofort
-    -- 2 = 0-30 Tage
-    -- 3 = 0-2 Monate
-    -- 4 = 0-6 Monate
-    -- 5 = 0-1 Jahr
-    -- 6 = 0-5 Jahre
+    -- How long alarm batteries last after the power is cut. Default=0-30 days
+    -- 1 = Instant, 2 = 0-30 days, 3 = 0-2 months, 4 = 0-6 months, 5 = 0-1 year,
+    -- 6 = 0-5 years
     AlarmDecay = 2,
-    -- Lege fest, wie lange nach dem Standard-Startdatum (9. Juli 1993) Sanitäranlagen (z.B. Waschbecken) aufhören sollen, unendlichen Wasserquellen zu sein. Minimum=-1 Maximum=2147483647 Standard=14
+    -- Exact number of days until the water is shut off.
+    -- Min=-1 Max=2147483647 Default=14
     WaterShutModifier = 14,
-    -- Lege fest, wie lange nach dem Standard-Startdatum (9. Juli 1993) der Strom endgültig abgeschaltet wird. Minimum=-1 Maximum=2147483647 Standard=14
+    -- Exact number of days until the power is shut off.
+    -- Min=-1 Max=2147483647 Default=14
     ElecShutModifier = 14,
-    -- Steuert, wie lange Alarmbatterien halten, nachdem der Strom abgeschaltet wird. Minimum=-1 Maximum=2147483647 Standard=14
+    -- Exact number of days alarm batteries last after the power is cut.
+    -- Min=-1 Max=2147483647 Default=14
     AlarmDecayModifier = 14,
-    -- Any food that can rot or spoil. Minimum=0,00 Maximum=4,00 Standard=0,80
+    -- Any food that can rot or spoil. Min=0.00 Max=4.00 Default=0.80
     FoodLootNew = 0.8,
-    -- All other items that can be read, including books, fliers, and newspapers. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- Everything else that can be read: books, fliers, newspapers. Min=0.00 Max=4.00 Default=0.60
     LiteratureLootNew = 0.6,
-    -- Books that provide skill XP multipliers. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- Books that grant skill XP multipliers. Min=0.00 Max=4.00 Default=0.60
     SkillBookLoot = 0.6,
-    -- Items that teach recipes. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- Items that teach recipes. Min=0.00 Max=4.00 Default=0.60
     RecipeResourceLoot = 0.6,
-    -- Medicine, bandages and first aid tools. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- Medicine, bandages and first aid tools. Min=0.00 Max=4.00 Default=0.60
     MedicalLootNew = 0.6,
-    -- Angeln, Zelte, Campingausrüstung usw. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- Fishing gear, tents, camping equipment and similar. Min=0.00 Max=4.00 Default=0.60
     SurvivalGearsLootNew = 0.6,
-    -- Canned and dried food, beverages. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- Canned and dried food, beverages. Min=0.00 Max=4.00 Default=0.60
     CannedFoodLootNew = 0.6,
-    -- Weapons that are not tools in other categories. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- Weapons that are not tools covered by another category. Min=0.00 Max=4.00 Default=0.60
     WeaponLootNew = 0.6,
-    -- Beinhaltet auch Waffenaufsätze. Minimum=0,00 Maximum=4,00 Standard=1,20
+    -- Ranged weapons, including weapon attachments. Min=0.00 Max=4.00 Default=1.20
     RangedWeaponLootNew = 1.2,
-    -- Loose ammo, boxes and magazines. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- Loose ammo, boxes and magazines. Min=0.00 Max=4.00 Default=0.60
     AmmoLootNew = 0.6,
-    -- Vehicle parts and the tools needed to install them. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- Vehicle parts and the tools needed to install them. Min=0.00 Max=4.00 Default=0.60
     MechanicsLootNew = 0.6,
-    -- Alles andere. Bezieht sich auch auf die Nahrungssuche in Stadt- und Straßenzonen. Minimum=0,00 Maximum=4,00 Standard=0,80
+    -- Everything else. Also applies to foraging in town and road zones. Min=0.00 Max=4.00 Default=0.80
     OtherLootNew = 0.8,
-    -- All wearable items that are not containers. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- All wearable items that are not containers. Min=0.00 Max=4.00 Default=0.60
     ClothingLootNew = 0.6,
-    -- Rucksäcke und andere tragbare/ausrüstbare Behälter, z. B. Koffer. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- Bags and other carryable containers, such as suitcases. Min=0.00 Max=4.00 Default=0.60
     ContainerLootNew = 0.6,
-    -- Schlüssel für Gebäude/Autos, Schlüsselanhänger und Schlösser. Minimum=0,00 Maximum=4,00 Standard=0,40
+    -- Building and car keys, key rings and padlocks. Min=0.00 Max=4.00 Default=0.40
     KeyLootNew = 0.4,
-    -- VHS-Kasetten und CDs. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- VHS tapes and CDs. Min=0.00 Max=4.00 Default=0.60
     MediaLootNew = 0.6,
-    -- Spiffo-Artikel, Plüschtiere und andere Andenken zum Sammeln, z. B. Fotos. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- Spiffo items, plush toys and other collectables such as photos. Min=0.00 Max=4.00 Default=0.60
     MementoLootNew = 0.6,
-    -- Gegenstände, die beim Kochen zum Einsatz kommen, einschließlich solcher, die als Waffen verwendet werden können (z. B. Messer). Keine Lebensmittel. Einschließlich brauchbarer und unbrauchbarer Gegenstände. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- Items used for cooking, including ones usable as weapons such as knives. No food.
+    -- Includes both usable and broken items. Min=0.00 Max=4.00 Default=0.60
     CookwareLootNew = 0.6,
-    -- Gegenstände und Waffen, die als Zutaten zum Basteln oder Bauen verwendet werden. Allgemeine Kategorie, die keine zu anderen Kategorien wie Kochen und Medizin gehörenden Gegenstände umfasst. Keine Werkzeuge. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- Items and weapons used as crafting or building material. General category that
+    -- excludes items belonging to cooking, medical and similar groups. No tools.
+    -- Min=0.00 Max=4.00 Default=0.60
     MaterialLootNew = 0.6,
-    -- Gegenstände und potenzielle Waffen, die sowohl in der Tier- als auch in der Pflanzenzucht verwendet werden, wie z. B. Saatgut, Kellen oder Schaufeln. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- Items and possible weapons used in animal and plant husbandry, such as seeds,
+    -- trowels or shovels. Min=0.00 Max=4.00 Default=0.60
     FarmingLootNew = 0.6,
-    -- Gegenstände und Waffen, die zu Werkzeugen gehören, aber nicht in andere Kategorien wie Kfz-Mechanik oder Landwirtschaft passen. Minimum=0,00 Maximum=4,00 Standard=0,60
+    -- Tools that do not fit another category such as mechanics or farming. Min=0.00 Max=4.00 Default=0.60
     ToolLootNew = 0.6,
-    -- <BHC> [!] Es wird empfohlen, diese Einstellung NICHT zu ändern. [!] <RGB:1,1,1>   Kann verwendet werden, um die Chance auf Beute anzupassen, wenn die Beute gespawnt wird. Kann Anzahl der Würfe nicht unter 1 reduzieren. Kann sich bei hohen Werten negativ auf die Leistung auswirken. Es wird dringend empfohlen, diese Einstellung nicht zu ändern. Minimum=0,10 Maximum=100,00 Standard=1,00
+    -- [!] Changing this setting is NOT recommended. [!]
+    -- Adjusts the loot chance when loot is rolled. Cannot reduce the number of rolls
+    -- below 1, and high values can hurt performance.
+    -- Min=0.10 Max=100.00 Default=1.00
     RollsMultiplier = 1.0,
-    -- Eine durch Kommas getrennte Liste von Gegenstandstypen, die nicht als gewöhnliche Beute spawnen werden.
+    -- Comma-separated list of item types that never spawn as ordinary loot.
     LootItemRemovalList = "",
-    -- Wenn diese Option aktiviert ist, spawnen Gegenstände, die auf der Entfernungsliste von Beutegegenständen stehen oder deren Seltenheit auf 'Keine' eingestellt ist, nicht in zufälligen Weltgeschichten.
+    -- Items on the removal list, or set to rarity 'none', do not spawn in random world
+    -- stories.
     RemoveStoryLoot = false,
-    -- Wenn diese Option aktiviert ist, spawnen Gegenstände, die auf der Entfernungsliste von Beutegegenständen stehen oder deren Seltenheit auf 'Keine' eingestellt ist, nicht an oder auf Zombies.
+    -- Items on the removal list, or set to rarity 'none', do not spawn on zombies.
     RemoveZombieLoot = false,
-    -- Ist der Wert größer als 0, wird das Spawnen von Beute im Verhältnis zur Anzahl der Zombies in der Nähe erhöht,  wobei der Effekt mit dieser Zahl multipliziert wird. Minimum=0 Maximum=20 Standard=0
+    -- Above 0, loot spawning rises in proportion to the number of nearby zombies,
+    -- multiplied by this value. Min=0 Max=20 Default=0
     ZombiePopLootEffect = 0,
-    -- Minimum=0,00 Maximum=0,20 Standard=0,05
+    -- Min=0.00 Max=0.20 Default=0.05
     InsaneLootFactor = 0.05,
-    -- Minimum=0,05 Maximum=0,60 Standard=0,20
+    -- Min=0.05 Max=0.60 Default=0.20
     ExtremeLootFactor = 0.2,
-    -- Minimum=0,20 Maximum=1,00 Standard=0,60
+    -- Min=0.20 Max=1.00 Default=0.60
     RareLootFactor = 0.6,
-    -- Minimum=0,60 Maximum=2,00 Standard=1,00
+    -- Min=0.60 Max=2.00 Default=1.00
     NormalLootFactor = 1.0,
-    -- Minimum=1,00 Maximum=3,00 Standard=2,00
+    -- Min=1.00 Max=3.00 Default=2.00
     CommonLootFactor = 2.0,
-    -- Minimum=2,00 Maximum=4,00 Standard=3,00
+    -- Min=2.00 Max=4.00 Default=3.00
     AbundantLootFactor = 3.0,
-    -- Steuert die globale Temperatur. Standard=Normal
-    -- 1 = Sehr kalt
-    -- 2 = Kalt
-    -- 3 = Normal
-    -- 4 = Heiß
-    -- 5 = Sehr heiß
+    -- Global temperature. Default=Normal
+    -- 1 = Very cold, 2 = Cold, 3 = Normal, 4 = Hot, 5 = Very hot
     Temperature = 3,
-    -- Steuert wie oft es regnet. Standard=Normal
-    -- 1 = Sehr trocken
-    -- 2 = Trocken
-    -- 3 = Normal
-    -- 4 = Regnerisch
-    -- 5 = Sehr regnerisch
+    -- How often it rains. Default=Normal
+    -- 1 = Very dry, 2 = Dry, 3 = Normal, 4 = Rainy, 5 = Very rainy
     Rain = 3,
-    -- Anzahl der Tage bis 100% Wachstum. Standard=Langsam (200 Tage)
-    -- 1 = Sehr schnell (20 Tage)
-    -- 2 = Schnell (50 Tage)
-    -- 3 = Normal (100 Tage)
-    -- 4 = Langsam (200 Tage)
-    -- 5 = Sehr langsam (500 Tage)
+    -- Days until erosion reaches full growth. Default=Slow (200 days)
+    -- 1 = Very fast (20 days), 2 = Fast (50 days), 3 = Normal (100 days),
+    -- 4 = Slow (200 days), 5 = Very slow (500 days)
     ErosionSpeed = 4,
-    -- Anzahl der Tage bis 100% Wachstum.  -1 bedeutet kein Wachstum.  Null bedeutet, die Erosionsgeschwindigkeitsoption zu nutzen.  Maximum 36,500 (100 Jahre). Minimum=-1 Maximum=36500 Standard=0
+    -- Days until full growth. -1 disables growth, 0 uses the ErosionSpeed option above.
+    -- Maximum 36500, which is 100 years. Min=-1 Max=36500 Default=0
     ErosionDays = 0,
-    -- Steuert die Geschwindigkeit des Pflanzenwachstums. Standard=Normal
-    -- 1 = Sehr schnell
-    -- 2 = Schnell
-    -- 3 = Normal
-    -- 4 = Langsam
-    -- 5 = Sehr langsam
+    -- Speed of plant growth. Default=Normal
+    -- 1 = Very fast, 2 = Fast, 3 = Normal, 4 = Slow, 5 = Very slow
     Farming = 3,
-    -- Steuert die Zeit, die es braucht, bis Lebensmittel in einem Komposter zerfallen. Standard=2 Wochen
-    -- 1 = 1 Woche
-    -- 2 = 2 Wochen
-    -- 3 = 3 Wochen
-    -- 4 = 4 Wochen
-    -- 5 = 6 Wochen
-    -- 6 = 8 Wochen
-    -- 7 = 10 Wochen
-    -- 8 = 12 Wochen
+    -- Time food needs to decay in a composter. Default=2 weeks
+    -- 1 = 1 week, 2 = 2 weeks, 3 = 3 weeks, 4 = 4 weeks, 5 = 6 weeks, 6 = 8 weeks,
+    -- 7 = 10 weeks, 8 = 12 weeks
     CompostTime = 2,
-    -- Wie schnell der Hunger, Durst und die Müdigkeit des Charakters abnimmt. Standard=Normal
-    -- 1 = Sehr schnell
-    -- 2 = Schnell
-    -- 3 = Normal
-    -- 4 = Langsam
-    -- 5 = Sehr langsam
+    -- How fast hunger, thirst and fatigue build up. Default=Normal
+    -- 1 = Very fast, 2 = Fast, 3 = Normal, 4 = Slow, 5 = Very slow
     StatsDecrease = 3,
-    -- Wirkt sich auf die Schwierigkeit von Fischen/Futtersuche aus. Standard=Normal
-    -- 1 = Sehr schlecht
-    -- 2 = Schlecht
-    -- 3 = Normal
-    -- 4 = Reichlich
-    -- 5 = Sehr reichlich
+    -- Difficulty of fishing and foraging. Default=Normal
+    -- 1 = Very poor, 2 = Poor, 3 = Normal, 4 = Abundant, 5 = Very abundant
     NatureAbundance = 3,
-    -- Die Chance beim ersten Einbruch, den Hausalarm auszulösen. Standard=Manchmal
-    -- 1 = Nie
-    -- 2 = Extrem selten
-    -- 3 = Selten
-    -- 4 = Manchmal
-    -- 5 = Oft
-    -- 6 = Sehr oft
+    -- Chance of setting off a house alarm on the first break-in. Default=Sometimes
+    -- 1 = Never, 2 = Extremely rare, 3 = Rare, 4 = Sometimes, 5 = Often, 6 = Very often
     Alarm = 4,
-    -- Definiere hier, wie oft die Türen/Fenster der Häuser gesperrt sein sollen. Standard=Sehr oft
-    -- 1 = Nie
-    -- 2 = Extrem selten
-    -- 3 = Selten
-    -- 4 = Manchmal
-    -- 5 = Oft
-    -- 6 = Sehr oft
+    -- How often house doors and windows are locked. Default=Very often
+    -- 1 = Never, 2 = Extremely rare, 3 = Rare, 4 = Sometimes, 5 = Often, 6 = Very often
     LockedHouses = 6,
-    -- Beginne mit einer Tasche und ein paar nützlichen Werkzeugen.
+    -- Start with a bag and a few useful tools.
     StarterKit = false,
-    -- Nährwert von Lebensmitteln wirkt sich auf den Zustand des Spielers aus.
+    -- Food nutrition affects the character's condition.
     Nutrition = true,
-    -- Definiere hier, wie schnell das Essen außerhalb eines Kühlschranks verderben soll. Standard=Normal
-    -- 1 = Sehr schnell
-    -- 2 = Schnell
-    -- 3 = Normal
-    -- 4 = Langsam
-    -- 5 = Sehr langsam
+    -- How fast food spoils outside a fridge. Default=Normal
+    -- 1 = Very fast, 2 = Fast, 3 = Normal, 4 = Slow, 5 = Very slow
     FoodRotSpeed = 3,
-    -- Definiere hier, wie wirksam ein Kühlschrank kühlen kann. Standard=Normal
-    -- 1 = Sehr wenig
-    -- 2 = Wenig
-    -- 3 = Normal
-    -- 4 = Hoch
-    -- 5 = Sehr hoch
-    -- 6 = Kein Verfall
+    -- How effectively a fridge cools. Default=Normal
+    -- 1 = Very low, 2 = Low, 3 = Normal, 4 = High, 5 = Very high, 6 = No decay
     FridgeFactor = 3,
-    -- Wenn der Wert größer als 0 ist, wird die Beute die gesehen wurde, nicht vor ablauf dieser Zeit (in Stunden) respawnen. Minimum=0 Maximum=2147483647 Standard=0
+    -- Above 0, loot that has been seen does not respawn before this many hours have
+    -- passed. Min=0 Max=2147483647 Default=0
     SeenHoursPreventLootRespawn = 0,
-    -- Wenn der Wert größer als 0 ist, wird nach X Stunden in allen Behältern der Welt Beute respawnen. Um Beute spawnen zu können, muss ein Behälter mindestens einmal geplündert worden sein. Beute-Respawn wird nicht durch die Sichtbarkeit oder nachfolgendes Plündern beeinflusst. Minimum=0 Maximum=2147483647 Standard=0
+    -- Above 0, loot respawns in every container in the world after this many hours. A
+    -- container must have been looted at least once. Not affected by visibility or by
+    -- later looting. Min=0 Max=2147483647 Default=0
     HoursForLootRespawn = 0,
-    -- Behälter mit dieser oder höheren Gegenstandsanzahl, werden keine neue Beute bekommen. Minimum=0 Maximum=2147483647 Standard=5
+    -- Containers holding this many items or more receive no new loot.
+    -- Min=0 Max=2147483647 Default=5
     MaxItemsForLootRespawn = 5,
-    -- Gegenstände erscheinen nicht in Zonen, die Spieler verbarrikadiert oder bebaut haben.
+    -- Loot does not spawn in zones that players have barricaded or built on.
     ConstructionPreventsLootRespawn = true,
-    -- Eine durch Kommata getrennte Liste von Gegenstandstypen, die nach der bestimmten Anzahl an Stunden entfernt werden.
+    -- Comma-separated list of item types removed after the number of hours set below.
     WorldItemRemovalList = "Base.Hat, Base.Glasses, Base.Maggots, Base.Slug, Base.Slug2, Base.Snail, Base.Worm, Base.Dung_Mouse, Base.Dung_Rat",
-    -- Anzahl der Stunden, die vergangen sein müssen, bis ein Gegenstand, der auf den Boden gefallen ist, aus der Spielwelt gelöscht wird.  Gegenstände werden entfernt, wenn der betreffende Teil der Karte das nächste Mal geladen wird.  Null bedeutet, dass die Gegenstände nicht entfernt werden. Minimum=0,00 Maximum=2147483647,00 Standard=24,00
+    -- Hours before an item dropped on the ground is deleted from the world. Removal
+    -- happens the next time that part of the map is loaded. 0 keeps items forever.
+    -- Min=0.00 Max=2147483647.00 Default=24.00
     HoursForWorldItemRemoval = 24.0,
-    -- Wenn aktiv, werden alle Elemente, die *nicht* in der Lösch-Liste enthalten sind, entfernt.
+    -- When enabled, everything *not* on the removal list is removed instead.
     ItemRemovalListBlacklistToggle = false,
-    -- Dies wird Auswirkungen auf die Erosion und den Zustand der Lebensmittel haben. Standard=0
-    -- 1 = 0
-    -- 2 = 1
-    -- 3 = 2
-    -- 4 = 3
-    -- 5 = 4
-    -- 6 = 5
-    -- 7 = 6
-    -- 8 = 7
-    -- 9 = 8
-    -- 10 = 9
-    -- 11 = 10
-    -- 12 = 11
-    -- 13 = 12
+    -- Months that have passed since the outbreak. Affects erosion and the state of
+    -- food. Default=0
+    -- 1 = 0, 2 = 1, 3 = 2, 4 = 3, 5 = 4, 6 = 5, 7 = 6, 8 = 7, 9 = 8, 10 = 9, 11 = 10,
+    -- 12 = 11, 13 = 12
     TimeSinceApo = 1,
-    -- Hat einfluss auf den täglichen Wasserverbrauch der Pflanzenanlagen, sowie die Resistenz gegenüber Krankheiten. Standard=Normal
-    -- 1 = Sehr hoch
-    -- 2 = Hoch
-    -- 3 = Normal
-    -- 4 = Niedrig
-    -- 5 = Sehr niedrig
+    -- Daily water use of crops and their resistance to disease. Default=Normal
+    -- 1 = Very high, 2 = High, 3 = Normal, 4 = Low, 5 = Very low
     PlantResilience = 3,
-    -- Beeinflusst den Ertrag der Pflanzenanlagen. Standard=Normal
-    -- 1 = Sehr schlecht
-    -- 2 = Schlecht
-    -- 3 = Normal
-    -- 4 = Reichlich
-    -- 5 = Sehr reichlich
+    -- Crop yield. Default=Normal
+    -- 1 = Very poor, 2 = Poor, 3 = Normal, 4 = Abundant, 5 = Very abundant
     PlantAbundance = 3,
-    -- Erholung von der Ermüdung durch das Ausführen von Handlungen. Standard=Normal
-    -- 1 = Sehr schnell
-    -- 2 = Schnell
-    -- 3 = Normal
-    -- 4 = Langsam
-    -- 5 = Sehr langsam
+    -- Recovery from the fatigue caused by performing actions. Default=Normal
+    -- 1 = Very fast, 2 = Fast, 3 = Normal, 4 = Slow, 5 = Very slow
     EndRegen = 3,
-    -- Regelt wie oft Hubschrauber über die Event-Zone fliegen. Standard=Einmal
-    -- 1 = Nie
-    -- 2 = Einmal
-    -- 3 = Manchmal
-    -- 4 = Oft
+    -- How often a helicopter passes over the event zone. Default=Once
+    -- 1 = Never, 2 = Once, 3 = Sometimes, 4 = Often
     Helicopter = 2,
-    -- Regelt wie oft Zombies angezogen werden. Wenn Meta-Ereignisse wie Hubschrauber und ferne Schüsse auftreten. Standard=Manchmal
-    -- 1 = Nie
-    -- 2 = Manchmal
-    -- 3 = Oft
+    -- How often meta events such as helicopters and distant gunshots occur and draw
+    -- zombies. Default=Sometimes
+    -- 1 = Never, 2 = Sometimes, 3 = Often
     MetaEvent = 2,
-    -- Regelt die Ereignisse in der Nachtzeit, während der Spieler schläft. Standard=Nie
-    -- 1 = Nie
-    -- 2 = Manchmal
-    -- 3 = Oft
+    -- Night-time events while the player sleeps. Default=Never
+    -- 1 = Never, 2 = Sometimes, 3 = Often
     SleepingEvent = 1,
-    -- Beeinflusst wie viel Kraftstoff von Generatoren verbraucht wird. Ein Generator der keinen Kraftstoff benötigt, sollte auf 0,0 eingestellt werden. Minimum=0,00 Maximum=100,00 Standard=0,10
+    -- How much fuel generators burn. 0.0 makes them run without fuel.
+    -- Min=0.00 Max=100.00 Default=0.10
     GeneratorFuelConsumption = 0.1,
-    -- Erhöht/Verringert die Wahrscheinlichkeit zum Erscheinen von Stromgeneratoren in der Welt. Standard=Oft
-    -- 1 = Extrem selten
-    -- 2 = Selten
-    -- 3 = Manchmal
-    -- 4 = Oft
-    -- 5 = Sehr oft
-    -- 6 = Häufig
-    -- 7 = Reichlich
+    -- How likely generators are to spawn in the world. Default=Often
+    -- 1 = Extremely rare, 2 = Rare, 3 = Sometimes, 4 = Often, 5 = Very often,
+    -- 6 = Common, 7 = Abundant
     GeneratorSpawning = 4,
-    -- Hat Auswirkungen darauf, wieviel Anmerkungen eine geplünderte Karte haben wird, die von einem verstorbenen Überlebenden gezeichnet wurden. Standard=Manchmal
-    -- 1 = Nie
-    -- 2 = Extrem selten
-    -- 3 = Selten
-    -- 4 = Manchmal
-    -- 5 = Oft
-    -- 6 = Sehr oft
+    -- How many annotations a looted map drawn by a dead survivor carries.
+    -- Default=Sometimes
+    -- 1 = Never, 2 = Extremely rare, 3 = Rare, 4 = Sometimes, 5 = Often, 6 = Very often
     AnnotatedMapChance = 4,
-    -- Fügt bei der Charakter-Erstellung freie Punkte hinzu. Minimum=-100 Maximum=100 Standard=0
+    -- Extra free points during character creation. Min=-100 Max=100 Default=0
     CharacterFreePoints = 0,
-    -- Gibt den von Spielern gebauten Konstruktionen zusätzliche Trefferpunkte, so dass sie widerstandsfähiger gegen Zombie-Schäden sind. Standard=Normal
-    -- 1 = Sehr niedrig
-    -- 2 = Niedrig
-    -- 3 = Normal
-    -- 4 = Hoch
-    -- 5 = Sehr hoch
+    -- Extra hit points for player-built constructions, making them more resistant to
+    -- zombie damage. Default=Normal
+    -- 1 = Very low, 2 = Low, 3 = Normal, 4 = High, 5 = Very high
     ConstructionBonusPoints = 3,
-    -- Regelt die Umgebungsbeleuchtung bei Nacht. Standard=Normal
-    -- 1 = Pechschwarz
-    -- 2 = Dunkel
-    -- 3 = Normal
-    -- 4 = Hell
+    -- Ambient light at night. Default=Normal
+    -- 1 = Pitch black, 2 = Dark, 3 = Normal, 4 = Bright
     NightDarkness = 3,
-    -- Regelt die Zeit von der Abenddämmerung bis zum Morgengrauen. Standard=Normal
-    -- 1 = Immer Nacht
-    -- 2 = Lang
-    -- 3 = Normal
-    -- 4 = Kurz
-    -- 5 = Immer Tag
+    -- Time from dusk to dawn. Default=Normal
+    -- 1 = Always night, 2 = Long, 3 = Normal, 4 = Short, 5 = Always day
     NightLength = 3,
-    -- Aktiviert/Deaktiviert gebrochene Gliedmaßen, wenn Überlebende Verletzungen von Stößen, Zombie-Schäden und Stürzen erhalten.
+    -- Enable broken limbs from impacts, zombie damage and falls.
     BoneFracture = true,
-    -- Erhöht/Verringert die Auswirkungen von Verletzungen auf den Körper und die Heilungszeit. Standard=Normal
-    -- 1 = Niedrig
-    -- 2 = Normal
-    -- 3 = Hoch
+    -- Effect of injuries on the body and on healing time. Default=Normal
+    -- 1 = Low, 2 = Normal, 3 = High
     InjurySeverity = 2,
-    -- Anzahl der Spielstunden bis Zombie-Leichen automatisch aus der Welt entfernt werden. (Ersetzt die ehemalige HoursForCorpseRemoval Server Option). Minimum=-1,00 Maximum=2147483647,00 Standard=216,00
+    -- In-game hours before zombie corpses are removed from the world. Replaces the
+    -- former HoursForCorpseRemoval server option.
+    -- Min=-1.00 Max=2147483647.00 Default=216.00
     HoursForCorpseRemoval = 216.0,
-    -- Beeinflusst die Wirkung der Gesundheit und Emotionen des Spielers in der Nähe verfaulender Körper. Standard=Normal
-    -- 1 = Keine
-    -- 2 = Niedrig
-    -- 3 = Normal
-    -- 4 = Hoch
-    -- 5 = Verrückt
+    -- Effect of nearby rotting bodies on the player's health and mood. Default=Normal
+    -- 1 = None, 2 = Low, 3 = Normal, 4 = High, 5 = Insane
     DecayingCorpseHealthImpact = 3,
-    -- Bestimmt, ob in der Nähe befindliche „lebende“ Zombies die gleichen Auswirkungen auf die Gesundheit und die Emotionen des Spielers haben.
+    -- Whether nearby 'living' zombies have the same effect on health and mood.
     ZombieHealthImpact = false,
-    -- Wie viel Blut wird auf Boden und Wände gespritzt. Standard=Normal
-    -- 1 = Keine
-    -- 2 = Niedrig
-    -- 3 = Normal
-    -- 4 = Hoch
-    -- 5 = Blutregen
+    -- How much blood is splattered on floors and walls. Default=Normal
+    -- 1 = None, 2 = Low, 3 = Normal, 4 = High, 5 = Blood rain
     BloodLevel = 3,
-    -- Beeinflusst wie schnell Kleidung verschlechtert wird, schmutzig und blutig. (Kann deaktiviert werden.) Standard=Normal
-    -- 1 = Deaktiviert
-    -- 2 = Langsam
-    -- 3 = Normal
-    -- 4 = Schnell
+    -- How fast clothing wears out and gets dirty and bloody. Default=Normal
+    -- 1 = Disabled, 2 = Slow, 3 = Normal, 4 = Fast
     ClothingDegradation = 3,
-    -- Bestimmt, ob Feuer sich ausbreiten kann.
+    -- Whether fire can spread.
     FireSpread = true,
-    -- Anzahl der Tage im Spiel, bevor verdorbenes Essen von der Karte entfernt wird. Der Wert -1 bedeutet, dass faules Essen niemals entfernt wird. Minimum=-1 Maximum=2147483647 Standard=-1
+    -- In-game days before rotten food is removed from the map. -1 keeps it forever.
+    -- Min=-1 Max=2147483647 Default=-1
     DaysForRottenFoodRemoval = -1,
-    -- Wenn aktiviert, arbeiten die Generatoren im Aussenbereich und ermöglichen so bspw., die Versorgung der Zapfsäule.
+    -- Generators work outdoors, which lets them power fuel pumps and similar.
     AllowExteriorGenerator = true,
-    -- Steuert die maximale Intensität des Nebels. Standard=Normal
-    -- 1 = Normal
-    -- 2 = Mäßig
-    -- 3 = Niedrig
-    -- 4 = Keine
+    -- Maximum fog intensity. Default=Normal
+    -- 1 = Normal, 2 = Moderate, 3 = Low, 4 = None
     MaxFogIntensity = 1,
-    -- Steuert die maximale Intensität des Regens. Standard=Normal
-    -- 1 = Normal
-    -- 2 = Mäßig
-    -- 3 = Niedrig
+    -- Maximum rain intensity. Default=Normal
+    -- 1 = Normal, 2 = Moderate, 3 = Low
     MaxRainFxIntensity = 1,
-    -- Wenn aktiviert sammelt sich Schnee nicht auf dem Boden an, sondern ist nur auf der Vegetation und den Dächern sichtbar.
+    -- Snow settles on the ground. When off it is only visible on vegetation and roofs.
     EnableSnowOnGround = true,
-    -- Dekativiere um während eines Nahkampfangriffs ungehindert laufen zu können.
+    -- Disable to move freely during a melee attack.
     AttackBlockMovements = true,
-    -- Erhöht/Verringert die Wahrscheinlichkeit von zufällig Generierten Häusern/Verstecken: Ausgebrannt, mit versteckter Beute oder Leichen etc. Standard=Selten
-    -- 1 = Nie
-    -- 2 = Extrem selten
-    -- 3 = Selten
-    -- 4 = Manchmal
-    -- 5 = Oft
-    -- 6 = Sehr oft
-    -- 7 = Immer versuchen
+    -- Likelihood of randomly generated survivor houses: burnt out, with hidden loot or
+    -- corpses. Default=Rare
+    -- 1 = Never, 2 = Extremely rare, 3 = Rare, 4 = Sometimes, 5 = Often, 6 = Very often, 7 = Always try
     SurvivorHouseChance = 3,
-    -- Wahrscheinlichkeit, mit der Straßengeschichten auftauchen (z.B. Straßensperren). Standard=Selten
-    -- 1 = Nie
-    -- 2 = Extrem selten
-    -- 3 = Selten
-    -- 4 = Manchmal
-    -- 5 = Oft
-    -- 6 = Sehr oft
-    -- 7 = Immer versuchen
+    -- Likelihood of road stories such as roadblocks. Default=Rare
+    -- 1 = Never, 2 = Extremely rare, 3 = Rare, 4 = Sometimes, 5 = Often, 6 = Very often, 7 = Always try
     VehicleStoryChance = 3,
-    -- Wahrscheinlichkeit, mit der Geschichten auftauchen, die für Kartenzonen spezifisch sind (z.B. Lagerfeuer im Wald). Standard=Selten
-    -- 1 = Nie
-    -- 2 = Extrem selten
-    -- 3 = Selten
-    -- 4 = Manchmal
-    -- 5 = Oft
-    -- 6 = Sehr oft
-    -- 7 = Immer versuchen
+    -- Likelihood of stories tied to map zones, such as a campfire in the woods.
+    -- Default=Rare
+    -- 1 = Never, 2 = Extremely rare, 3 = Rare, 4 = Sometimes, 5 = Often, 6 = Very often, 7 = Always try
     ZoneStoryChance = 3,
-    -- Ermöglicht es dir, bei der Anpassung deines Charakters aus allen Kleidungsstücken im Spiel zu wählen
+    -- Choose from every clothing item in the game during character customisation.
     AllClothesUnlocked = false,
-    -- Wenn deaktiviert, wird verunreinigtes Wasser nicht als solches durch eine Warnung gekennzeichnet
+    -- When off, tainted water is not marked with a warning.
     EnableTaintedWaterText = true,
-    -- Ermöglicht das Spawnen von Fahrzeugen.
+    -- Allow vehicles to spawn.
     EnableVehicles = true,
-    -- Regelt wie oft Autos auf der Karte gefunden werden können. Standard=Wenig
-    -- 1 = Keine
-    -- 2 = Sehr wenig
-    -- 3 = Wenig
-    -- 4 = Normal
-    -- 5 = Hoch
+    -- How often cars are found on the map. Default=Low
+    -- 1 = None, 2 = Very low, 3 = Low, 4 = Normal, 5 = High
     CarSpawnRate = 3,
-    -- Verwende dies, um die allgemeine Lautstärke des Motors zu reduzieren oder zu erhöhen. Minimum=0,00 Maximum=100,00 Standard=1,00
+    -- Overall loudness of engines. Min=0.00 Max=100.00 Default=1.00
     ZombieAttractionMultiplier = 1.0,
-    -- Regelt, ob Autos verschlossen sind, Schlüssel zum Starten benötigen usw.
+    -- Cars are unlocked and need no key to start.
     VehicleEasyUse = false,
-    -- Regelt den Kraftstofffüllstand von entdeckten Autos. Standard=Niedrig
-    -- 1 = Sehr niedrig
-    -- 2 = Niedrig
-    -- 3 = Normal
-    -- 4 = Hoch
-    -- 5 = Sehr hoch
-    -- 6 = Voll
+    -- Fuel level of discovered cars. Default=Low
+    -- 1 = Very low, 2 = Low, 3 = Normal, 4 = High, 5 = Very high, 6 = Full
     InitialGas = 2,
-    -- Wenn aktiv, geht den Zapfsäulen nie der Kraftstoff aus
+    -- Fuel pumps never run dry.
     FuelStationGasInfinite = false,
-    -- Gibt die Mindestmenge an Benzin an, die in den Zapfsäulen auftauchen kann. Aktiviere die Fortgeschritten-Option unten, um eine benutzerdefinierte Menge zu verwenden. Minimum=0,00 Maximum=1,00 Standard=0,00
+    -- Minimum amount of fuel a pump can spawn with. Min=0.00 Max=1.00 Default=0.00
     FuelStationGasMin = 0.0,
-    -- Gibt die Höchstmenge an Benzin an, die in den Zapfsäulen auftauchen kann. Aktiviere die Fortgeschritten-Option unten, um eine benutzerdefinierte Menge zu verwenden. Minimum=0,00 Maximum=1,00 Standard=0,80
+    -- Maximum amount of fuel a pump can spawn with. Min=0.00 Max=1.00 Default=0.80
     FuelStationGasMax = 0.8,
-    -- Gibt die Wahrscheinlichkeit in Prozent an, dass einzelne Zapfsäulen beim Start leer sind. Minimum=0 Maximum=100 Standard=20
+    -- Percentage chance that an individual pump starts out empty.
+    -- Min=0 Max=100 Default=20
     FuelStationGasEmptyChance = 20,
-    -- Regelt die Wahrscheinlich, dass Autos verschlossen sind Standard=Manchmal
-    -- 1 = Nie
-    -- 2 = Extrem selten
-    -- 3 = Selten
-    -- 4 = Manchmal
-    -- 5 = Oft
-    -- 6 = Sehr oft
+    -- How likely cars are to be locked. Default=Sometimes
+    -- 1 = Never, 2 = Extremely rare, 3 = Rare, 4 = Sometimes, 5 = Often, 6 = Very often
     LockedCar = 4,
-    -- Steuert wie sprithungrig die Fahrzeuge auf der Karte sind. Minimum=0,00 Maximum=100,00 Standard=1,00
+    -- How thirsty vehicles on the map are. Min=0.00 Max=100.00 Default=1.00
     CarGasConsumption = 1.0,
-    -- In welchem Zustand wird das neue Auto erscheinen. Standard=Normal
-    -- 1 = Sehr niedrig
-    -- 2 = Niedrig
-    -- 3 = Normal
-    -- 4 = Hoch
-    -- 5 = Sehr hoch
+    -- Condition newly found cars are in. Default=Normal
+    -- 1 = Very low, 2 = Low, 3 = Normal, 4 = High, 5 = Very high
     CarGeneralCondition = 3,
-    -- Steuert den Schaden, der den verunfallenden Fahrzeugen zugefügt wird. Standard=Normal
-    -- 1 = Sehr niedrig
-    -- 2 = Niedrig
-    -- 3 = Normal
-    -- 4 = Hoch
-    -- 5 = Sehr hoch
+    -- Damage vehicles take in a crash. Default=Normal
+    -- 1 = Very low, 2 = Low, 3 = Normal, 4 = High, 5 = Very high
     CarDamageOnImpact = 3,
-    -- Schaden den der Spieler bei einer Kollision vom Auto erhält. Standard=Keine
-    -- 1 = Keine
-    -- 2 = Niedrig
-    -- 3 = Normal
-    -- 4 = Hoch
-    -- 5 = Sehr hoch
+    -- Damage the player takes when hit by a car. Default=None
+    -- 1 = None, 2 = Low, 3 = Normal, 4 = High, 5 = Very high
     DamageToPlayerFromHitByACar = 1,
-    -- Aktiviere oder deaktiviere Fahrzeugwracks, die auf den Hauptstraßen der Karte erscheinen.
+    -- Vehicle wrecks appear on the map's main roads.
     TrafficJam = true,
-    -- Wie oft werden Autos mit einem Alarm gefunden. Standard=Selten
-    -- 1 = Nie
-    -- 2 = Extrem selten
-    -- 3 = Selten
-    -- 4 = Manchmal
-    -- 5 = Oft
-    -- 6 = Sehr oft
+    -- How often cars are found with an alarm. Default=Rare
+    -- 1 = Never, 2 = Extremely rare, 3 = Rare, 4 = Sometimes, 5 = Often, 6 = Very often
     CarAlarm = 3,
-    -- Aktiviere/Deaktiviere, Spielerschäden durch einen Autounfall.
+    -- Players take damage in a car crash.
     PlayerDamageFromCrash = true,
-    -- Anzahl der Stunden bevor der Sirenenton aufhört zu spielen.  0.0 - bedeutet spielen bis der Akku leer ist. Minimum=0,00 Maximum=168,00 Standard=0,00
+    -- Hours before a siren stops sounding. 0.0 plays until the battery is empty.
+    -- Min=0.00 Max=168.00 Default=0.00
     SirenShutoffHours = 0.0,
-    -- Regelt die Chancen für Fahrzeuge mit Kraftstoff im Tank zu finden. Standard=Normal
-    -- 1 = Niedrig
-    -- 2 = Normal
-    -- 3 = Hoch
+    -- Chance of finding vehicles with fuel in the tank. Default=Normal
+    -- 1 = Low, 2 = Normal, 3 = High
     ChanceHasGas = 2,
-    -- Legt fest, ob der Spieler ein Auto entdecken kann, das nach der Infektion gewartet und gepflegt wurde. Standard=Niedrig
-    -- 1 = Keine
-    -- 2 = Niedrig
-    -- 3 = Normal
-    -- 4 = Hoch
+    -- Chance of finding a car that was looked after since the outbreak. Default=Low
+    -- 1 = None, 2 = Low, 3 = Normal, 4 = High
     RecentlySurvivorVehicles = 2,
-    -- Wenn aktiviert, gewisse Nahkampfwaffen können mehrere Zombies mit einem Schlag treffen.
+    -- Some melee weapons can hit several zombies with one swing.
     MultiHitZombies = false,
-    -- Chance gebissen zu werden, wenn ein Zombie von hinten angreift. Standard=Hoch
-    -- 1 = Niedrig
-    -- 2 = Mittel
-    -- 3 = Hoch
+    -- Chance of being bitten when a zombie attacks from behind. Default=High
+    -- 1 = Low, 2 = Medium, 3 = High
     RearVulnerability = 3,
-    -- Bestimmt, ob Zombies sich auf den Klang von Fahrzeugsirenen zubewegen.
+    -- Zombies move towards the sound of vehicle sirens.
     SirenEffectsZombies = true,
-    -- Geschwindigkeit, mit der Tierstatistiken (Hunger, Durst, usw.) abnehmen. Standard=Normal
-    -- 1 = Ultra schnell
-    -- 2 = Sehr schnell
-    -- 3 = Schnell
-    -- 4 = Normal
-    -- 5 = Langsam
-    -- 6 = Sehr langsam
+    -- Rate at which animal stats such as hunger and thirst decrease. Default=Normal
+    -- 1 = Ultra fast, 2 = Very fast, 3 = Fast, 4 = Normal, 5 = Slow, 6 = Very slow
     AnimalStatsModifier = 4,
-    -- Geschwindigkeit, mit der Tierstatistiken (Hunger, Durst, usw.) im Meta-Modus abnehmen. Standard=Normal
-    -- 1 = Ultra schnell
-    -- 2 = Sehr schnell
-    -- 3 = Schnell
-    -- 4 = Normal
-    -- 5 = Langsam
-    -- 6 = Sehr langsam
+    -- The same, for animals handled in meta mode. Default=Normal
+    -- 1 = Ultra fast, 2 = Very fast, 3 = Fast, 4 = Normal, 5 = Slow, 6 = Very slow
     AnimalMetaStatsModifier = 4,
-    -- Wie lange Tiere trächtig sind, bevor sie Junge gebären. Standard=Normal
-    -- 1 = Ultra schnell
-    -- 2 = Sehr schnell
-    -- 3 = Schnell
-    -- 4 = Normal
-    -- 5 = Langsam
-    -- 6 = Sehr langsam
+    -- How long animals stay pregnant before giving birth. Default=Normal
+    -- 1 = Ultra fast, 2 = Very fast, 3 = Fast, 4 = Normal, 5 = Slow, 6 = Very slow
     AnimalPregnancyTime = 4,
-    -- Geschwindigkeit, mit der Tiere altern. Standard=Normal
-    -- 1 = Ultra schnell
-    -- 2 = Sehr schnell
-    -- 3 = Schnell
-    -- 4 = Normal
-    -- 5 = Langsam
-    -- 6 = Sehr langsam
+    -- Rate at which animals age. Default=Normal
+    -- 1 = Ultra fast, 2 = Very fast, 3 = Fast, 4 = Normal, 5 = Slow, 6 = Very slow
     AnimalAgeModifier = 4,
-    -- Standard=Normal
-    -- 1 = Ultra schnell
-    -- 2 = Sehr schnell
-    -- 3 = Schnell
-    -- 4 = Normal
-    -- 5 = Langsam
-    -- 6 = Sehr langsam
+    -- Rate at which animals produce milk. Default=Normal
+    -- 1 = Ultra fast, 2 = Very fast, 3 = Fast, 4 = Normal, 5 = Slow, 6 = Very slow
     AnimalMilkIncModifier = 4,
-    -- Standard=Normal
-    -- 1 = Ultra schnell
-    -- 2 = Sehr schnell
-    -- 3 = Schnell
-    -- 4 = Normal
-    -- 5 = Langsam
-    -- 6 = Sehr langsam
+    -- Rate at which animals grow wool. Default=Normal
+    -- 1 = Ultra fast, 2 = Very fast, 3 = Fast, 4 = Normal, 5 = Slow, 6 = Very slow
     AnimalWoolIncModifier = 4,
-    -- Bestimmt die Chance, Tiere auf Farmen zu finden. Standard=Oft
-    -- 1 = Nie
-    -- 2 = Extrem selten
-    -- 3 = Selten
-    -- 4 = Manchmal
-    -- 5 = Oft
-    -- 6 = Sehr oft
-    -- 7 = Immer
+    -- Chance of finding animals on farms. Default=Often
+    -- 1 = Never, 2 = Extremely rare, 3 = Rare, 4 = Sometimes, 5 = Often, 6 = Very often, 7 = Always
     AnimalRanchChance = 5,
-    -- Anzahl der Stunden, nach deren Ablauf Gras nachwächst,  das von Tieren gefressen oder vom Spieler gemäht wurde. Minimum=1 Maximum=9999 Standard=240
+    -- Hours before grass eaten by animals or mown by the player grows back.
+    -- Min=1 Max=9999 Default=240
     AnimalGrassRegrowTime = 240,
-    -- Bestimmt, ob ein Meta-Fuchs (d.h. ein im Spiel nicht sichtbarer) deine  Hühner angreifen kann, wenn die Stalltür nachts aufgelassen wird.
+    -- A meta fox, one not visible in the game, can attack chickens when the coop door
+    -- is left open at night.
     AnimalMetaPredator = false,
-    -- Bei aktivierter Option beachten betroffene Tierarten ihren Fortpflanzungszirkus.  Ansonsten können sie sich das ganze Jahr über fortpflanzen bzw. Eier legen.
+    -- Affected species follow their breeding season. When off they breed and lay eggs
+    -- all year round.
     AnimalMatingSeason = true,
-    -- Wie lange es dauert, bevor Küken aus Eiern hüpfen. Standard=Normal
-    -- 1 = Ultra schnell
-    -- 2 = Sehr schnell
-    -- 3 = Schnell
-    -- 4 = Normal
-    -- 5 = Langsam
-    -- 6 = Sehr langsam
+    -- How long eggs take to hatch. Default=Normal
+    -- 1 = Ultra fast, 2 = Very fast, 3 = Fast, 4 = Normal, 5 = Slow, 6 = Very slow
     AnimalEggHatch = 4,
-    -- Wenn aktiviert, ziehen Tierlaute in der Nähe befindliche Zombies an.
+    -- Animal noises attract nearby zombies.
     AnimalSoundAttractZombies = true,
-    -- The chance of animals leaving tracks. Standard=Manchmal
-    -- 1 = Nie
-    -- 2 = Extrem selten
-    -- 3 = Selten
-    -- 4 = Manchmal
-    -- 5 = Oft
-    -- 6 = Sehr oft
+    -- Chance of animals leaving tracks. Default=Sometimes
+    -- 1 = Never, 2 = Extremely rare, 3 = Rare, 4 = Sometimes, 5 = Often, 6 = Very often
     AnimalTrackChance = 4,
-    -- The chance of creating a path for animals to be hunted. Standard=Manchmal
-    -- 1 = Nie
-    -- 2 = Extrem selten
-    -- 3 = Selten
-    -- 4 = Manchmal
-    -- 5 = Oft
-    -- 6 = Sehr oft
+    -- Chance of creating a path along which animals can be hunted. Default=Sometimes
+    -- 1 = Never, 2 = Extremely rare, 3 = Rare, 4 = Sometimes, 5 = Often, 6 = Very often
     AnimalPathChance = 4,
-    -- Häufigkeit und Intensität von Befall durch Ratten und Ungeziefer in betroffenen Gebäuden. Minimum=0 Maximum=50 Standard=25
+    -- Frequency and intensity of rat and vermin infestations in affected buildings.
+    -- Min=0 Max=50 Default=25
     MaximumRatIndex = 25,
-    -- Wie lange es dauert, bis die maximale Ungezieferdichte erreicht ist. Minimum=0 Maximum=365 Standard=90
+    -- Days until the maximum vermin density is reached. Min=0 Max=365 Default=90
     DaysUntilMaximumRatIndex = 90,
-    -- Wenn ein Medium nicht vollständig gesehen oder gelesen wurde, bestimmt diese Einstellung, ob es vollständig angezeigt, als "???" angezeigt oder komplett ausgeblendet wird. Standard=Komplett ausgeblendet
-    -- 1 = Vollständig angezeigt
-    -- 2 = Als ??? angezeigt
-    -- 3 = Komplett ausgeblendet
+    -- How media that has not been fully watched or read is displayed.
+    -- Default=Hidden completely
+    -- 1 = Shown in full, 2 = Shown as ???, 3 = Hidden completely
     MetaKnowledge = 3,
-    -- Wenn aktiv kannst du alle Rezepte sehen, die an einer Station hergestellt werden können, auch wenn sie noch nicht bekannt sind.
+    -- See every recipe a station can produce, including ones not yet known.
     SeeNotLearntRecipe = true,
-    -- Wenn ein Gebäude mehr Räumen hat, als hier festgelegt, wird es nicht geplündert. Minimum=0 Maximum=200 Standard=50
+    -- Buildings with more rooms than this are never pre-looted.
+    -- Min=0 Max=200 Default=50
     MaximumLootedBuildingRooms = 50,
-    -- Regelt, ob das Vergiften von Lebensmitteln aktiviert ist. Standard=Richtig
-    -- 1 = Richtig
-    -- 2 = Falsch
-    -- 3 = Nur die Bleichmittelvergiftung ist deaktiviert
+    -- Whether food poisoning is enabled. Default=True
+    -- 1 = True, 2 = False, 3 = Only bleach poisoning disabled
     EnablePoisoning = 1,
-    -- Bestimmt, ob und wann Maden in Leichen spawnen können. Standard=In und um Körper
-    -- 1 = In und um Körper
-    -- 2 = Nur in Körpern
-    -- 3 = Niemals
+    -- Whether and where maggots spawn on corpses. Default=In and around bodies
+    -- 1 = In and around bodies, 2 = In bodies only, 3 = Never
     MaggotSpawn = 1,
-    -- Je höher der Wert, desto länger halten Glühbirnen, bevor sie kaputt gehen. Bei 0 gehen Glühbirnen niemals kaputt. Beeinflusst nicht die Fahrzeugscheinwerfer. Minimum=0,00 Maximum=1000,00 Standard=2,00
+    -- Higher values make bulbs last longer before they break. 0 means they never break.
+    -- Does not affect vehicle headlights. Min=0.00 Max=1000.00 Default=2.00
     LightBulbLifespan = 2.0,
-    -- Fischreichtum in Flüssen und Seen. Standard=Schlecht
-    -- 1 = Sehr schlecht
-    -- 2 = Schlecht
-    -- 3 = Normal
-    -- 4 = Reichlich
-    -- 5 = Sehr reichlich
+    -- Fish population in rivers and lakes. Default=Poor
+    -- 1 = Very poor, 2 = Poor, 3 = Normal, 4 = Abundant, 5 = Very abundant
     FishAbundance = 2,
-    -- Steht eine Fähigkeit auf dieser Stufe oder höher, bringen Fernsehen/VHS/andere Medien  keine EP ein. Minimum=0 Maximum=10 Standard=3
+    -- At or above this skill level, TV, VHS and other media grant no XP.
+    -- Min=0 Max=10 Default=3
     LevelForMediaXPCutoff = 3,
-    -- Steht eine Fähigkeit auf dieser Stufe oder höher, bringt das Zerlegen von Möbeln keine EP für ein. Gilt nicht für Elektrotechnik. Minimum=0 Maximum=10 Standard=0
+    -- At or above this skill level, dismantling furniture grants no XP. Does not apply
+    -- to electrical. Min=0 Max=10 Default=0
     LevelForDismantleXPCutoff = 0,
-    -- Anzahl der Tage, bevor alte Blutspritzer entfernt werden. Entfernung erfolgt, wenn Kartenteile geladen werden. Bei 0 werden sie nie entfernt. Minimum=0 Maximum=365 Standard=0
+    -- Days before old blood splatter is removed. Removal happens when map chunks are
+    -- loaded. 0 means never. Min=0 Max=365 Default=0
     BloodSplatLifespanDays = 0,
-    -- Anzahl der Tage, bis wieder von bereits gelesener Literatur profitiert werden kann. Minimum=1 Maximum=365 Standard=45
+    -- Days before already-read literature gives a benefit again.
+    -- Min=1 Max=365 Default=45
     LiteratureCooldown = 45,
-    -- Bestimmt, ob sich der Bonus auf Eigenschaftspunkte bei der Auswahl mehrerer negativer Eigenschaften verringert. Standard=Keine
-    -- 1 = Keine
-    -- 2 = 1 Punkt Strafe pro 3 gewählte negative Eigenschaften
-    -- 3 = 1 Punkt Strafe pro 2 gewählte negative Eigenschaften
-    -- 4 = 1 Punkt Strafe für jede gewählte negative Eigenschaft nach der ersten
+    -- Whether the trait point bonus shrinks when several negative traits are picked.
+    -- Default=None
+    -- 1 = None, 2 = 1 point penalty per 3 negative traits,
+    -- 3 = 1 point penalty per 2 negative traits,
+    -- 4 = 1 point penalty for every negative trait after the first
     NegativeTraitsPenalty = 1,
-    -- Dauer in Spielwelt-Minuten, die zum Lesen einer Seite benötigt wird. Minimum=0,00 Maximum=60,00 Standard=2,00
+    -- In-game minutes needed to read one page. Min=0.00 Max=60.00 Default=2.00
     MinutesPerPage = 2.0,
-    -- Wenn aktiv, sterben Nutzpflanzen und Kräuter, die in Gebäuden wachsen. Gilt nicht für Hauspflanzen.
+    -- Crops and herbs grown inside buildings die. Does not apply to house plants.
     KillInsideCrops = true,
-    -- Wenn aktiv, wird der Pflanzenwachstum von Jahreszeiten beeinflusst.
+    -- Plant growth is affected by the seasons.
     PlantGrowingSeasons = true,
-    -- <BHC> [!] Es wird empfohlen, diese Einstellung NICHT zu ändern. Eine Änderung dieser Einstellung kann zu Performance-Problemen führen. [!] <RGB:1,1,1>   Wenn aktiviert, kann Erde auch auf anderen Ebenen als der Bodenebene platziert und bewirtschaftet werden.
+    -- [!] Changing this setting is NOT recommended and can cause performance problems. [!]
+    -- Allows dirt to be placed and farmed on levels other than the ground floor.
     PlaceDirtAboveground = false,
-    -- Die Geschwindigkeit des Pflanzenwachstums. Minimum=0,10 Maximum=100,00 Standard=1,00
+    -- Speed of plant growth. Min=0.10 Max=100.00 Default=1.00
     FarmingSpeedNew = 1.0,
-    -- Bestimmt den Ernteertrag. Minimum=0,10 Maximum=10,00 Standard=1,00
+    -- Harvest yield. Min=0.10 Max=10.00 Default=1.00
     FarmingAmountNew = 1.0,
-    -- Die Wahrscheinlichkeit, dass ein Gebäude bereits geplündert ist, wenn es gefunden wird. Aktiviere die Fortgeschritten-Option unten, um eine benutzerdefinierten Wert zu verwenden. Minimum=0 Maximum=200 Standard=25
+    -- Chance that a building has already been looted when it is found.
+    -- Min=0 Max=200 Default=25
     MaximumLooted = 25,
-    -- Wie lange es dauert, bis die maximale Wahrscheinlichkeit auf das Vorfinden geplünderter Häuser erreicht ist. Minimum=0 Maximum=3650 Standard=90
+    -- Days until that maximum chance is reached. Min=0 Max=3650 Default=90
     DaysUntilMaximumLooted = 90,
-    -- Die Chance, dass ein Gebäude auf dem Land bereits geplündert ist, wenn es gefunden wird. Aktiviere die Fortgeschritten-Option unten, um eine benutzerdefinierten Wert zu verwenden. Minimum=0,00 Maximum=2,00 Standard=0,50
+    -- Chance that a rural building has already been looted when it is found.
+    -- Min=0.00 Max=2.00 Default=0.50
     RuralLooted = 0.5,
-    -- Die maximale Beute, die nicht spawnen wird, wenn der Tag der maximal verringerten Beute erreicht ist. Aktiviere die Fortgeschritten-Option unten, um eine exakte Prozentzahl zu verwenden. Minimum=0 Maximum=100 Standard=20
+    -- Maximum share of loot that stops spawning once the day below is reached.
+    -- Min=0 Max=100 Default=20
     MaximumDiminishedLoot = 20,
-    -- Tage, bis die maximal verringerten Beute erreicht wird. Minimum=0 Maximum=3650 Standard=3650
+    -- Days until the maximum diminished loot is reached. Min=0 Max=3650 Default=3650
     DaysUntilMaximumDiminishedLoot = 3650,
-    -- Wirkt als Multiplikator bei der Belastung der Muskeln durch das Schwingen von Waffen oder das Tragen schwerer Lasten. Minimum=0,00 Maximum=10,00 Standard=0,70
+    -- Multiplier for muscle strain from swinging weapons or carrying heavy loads.
+    -- Min=0.00 Max=10.00 Default=0.70
     MuscleStrainFactor = 0.7,
-    -- Wirkt als Multiplikator für Unwohlsein durch getragener Gegenstände. Minimum=0,00 Maximum=10,00 Standard=0,80
+    -- Multiplier for the discomfort caused by worn items.
+    -- Min=0.00 Max=10.00 Default=0.80
     DiscomfortFactor = 0.8,
-    -- Wenn größer als Null, kann Schaden durch schwere Wundinfektionen verursacht werden. Minimum=0,00 Maximum=10,00 Standard=1,00
+    -- Above 0, severe wound infections can cause damage.
+    -- Min=0.00 Max=10.00 Default=1.00
     WoundInfectionFactor = 1.0,
-    -- Wenn aktiviert, wird Kleidung mit zufälligen Farbtönen nicht so dunkel sein, dass sie praktisch schwarz ist.
+    -- Randomly tinted clothing will not come out so dark that it is effectively black.
     NoBlackClothes = true,
-    -- Deaktiviert die Wahrscheinlichkeit, beim Klettern an Seilen oder über Mauern hinweg zu scheitern.
+    -- Removes the chance of failing when climbing ropes or over fences.
     EasyClimbing = false,
-    -- Die maximale Brenndauer an Material, die in ein Lagerfeuer, einen Holzofen usw. eingelegt werden kann. Minimum=1 Maximum=168 Standard=8
+    -- Maximum burn time of material that can be put into a campfire, wood stove and
+    -- similar. Min=1 Max=168 Default=8
     MaximumFireFuelHours = 8,
-    -- Ersetzt die Trefferchance-Mechanik durch die Berechnung der Schadenschance. In diesem Modus wird das Zielen durch den Spieler bevorzugt. Standard=Zombies only
-    -- 1 = Disabled
-    -- 2 = Zombies only
-    -- 3 = All types of target
+    -- Replaces the hit-chance mechanic with a damage-chance calculation, which favours
+    -- the player's own aim. Default=Zombies only
+    -- 1 = Disabled, 2 = Zombies only, 3 = All types of target
     FirearmUseDamageChance = 2,
-    -- Ein Multiplikator für die Entfernung, aus der Zombies Schüsse hören können. Minimum=0,20 Maximum=2,00 Standard=1,00
+    -- Multiplier for the distance from which zombies hear gunshots.
+    -- Min=0.20 Max=2.00 Default=1.00
     FirearmNoiseMultiplier = 1.0,
-    -- Multiplikator für die Wahrscheinlichkeit, mit der Schusswaffen klemmen. 0 deaktiviert Klemmen. Minimum=0,00 Maximum=10,00 Standard=1,00
+    -- Multiplier for the chance of a firearm jamming. 0 disables jamming.
+    -- Min=0.00 Max=10.00 Default=1.00
     FirearmJamMultiplier = 1.0,
-    -- Multiplikator für Zustandseffekte auf Trefferchance. 0 deaktiviert Zustandsstrafe. Minimum=0,00 Maximum=10,00 Standard=1,00
+    -- Multiplier for moodle effects on hit chance. 0 disables the penalty.
+    -- Min=0.00 Max=10.00 Default=1.00
     FirearmMoodleMultiplier = 1.0,
-    -- Multiplikator für Wettereffekte (Wind, Regen und Nebel) bei Trefferchance. 0 deaktiviert Wettereffekte. Minimum=0,00 Maximum=10,00 Standard=1,00
+    -- Multiplier for weather effects such as wind, rain and fog on hit chance.
+    -- 0 disables them. Min=0.00 Max=10.00 Default=1.00
     FirearmWeatherMultiplier = 1.0,
-    -- Aktivieren, damit Kopfbedeckungen wie Schweißmasken die Trefferchance beeinflussen
+    -- Head gear such as a welding mask affects hit chance.
     FirearmHeadGearEffect = true,
-    -- Chance to turn a dirt floor into a clay floor. Applies to lakes. Minimum=0,00 Maximum=1,00 Standard=0,05
+    -- Chance of turning a dirt floor into a clay floor. Applies to lakes.
+    -- Min=0.00 Max=1.00 Default=0.05
     ClayLakeChance = 0.05,
-    -- Chance to turn a dirt floor into a clay floor. Applies to rivers. Minimum=0,00 Maximum=1,00 Standard=0,05
+    -- The same, applied to rivers. Min=0.00 Max=1.00 Default=0.05
     ClayRiverChance = 0.05,
-    -- Minimum=1 Maximum=100 Standard=20
+    -- Min=1 Max=100 Default=20
     GeneratorTileRange = 20,
-    -- How many levels both above and below a generator it can provide with electricity. Minimum=1 Maximum=15 Standard=3
+    -- How many levels above and below itself a generator can supply with electricity.
+    -- Min=1 Max=15 Default=3
     GeneratorVerticalPowerRange = 3,
+    -- Basement generation.
     Basement = {
-        -- Bestimmt, wie häufig Keller an zufälligen Orten spawnen. Standard=Manchmal
-        -- 1 = Nie
-        -- 2 = Extrem selten
-        -- 3 = Selten
-        -- 4 = Manchmal
-        -- 5 = Oft
-        -- 6 = Sehr oft
-        -- 7 = Immer
+        -- How often basements spawn in random locations. Default=Sometimes
+        -- 1 = Never, 2 = Extremely rare, 3 = Rare, 4 = Sometimes, 5 = Often, 6 = Very often, 7 = Always
         SpawnFrequency = 4,
     },
+    -- Map and map item settings.
+    -- Map and map item settings.
     Map = {
-        -- Wenn diese Option aktiviert ist, wird ein Minikartenfenster angezeigt.
+        -- Show the minimap window.
         AllowMiniMap = false,
-        -- Wenn diese Option aktiviert ist, kann auf die Weltkarte zugegriffen werden.
+        -- Allow access to the world map.
         AllowWorldMap = true,
-        -- Wenn diese Option aktiviert ist, wird die Weltkarte beim Spielstart komplett bekannt sein.
+        -- The whole world map is known from the start.
         MapAllKnown = false,
-        -- Bei aktivierter Funktion können die Karten nur gelesen werden, wenn eine Lichtquelle vorhanden ist.
+        -- Maps can only be read when a light source is present.
         MapNeedsLight = true,
     },
+    -- Zombie behaviour.
+    -- Zombie behaviour.
     ZombieLore = {
-        -- Steuert die Zombie-Bewegungsrate. Standard=zufällig
-        -- 1 = Sprinter
-        -- 2 = Schnelle Schlurfer
-        -- 3 = Schlurfer
-        -- 4 = zufällig
+        -- Zombie movement speed. Default=Random
+        -- 1 = Sprinters, 2 = Fast shamblers, 3 = Shamblers, 4 = Random
         Speed = 4,
-        -- Wenn zufällige Geschwindigkeit aktiviert ist, wird hier festgesetzt, wie viel Prozent der Zombies Sprinter sind. Aktiviere die Fortgeschritten-Option unten, um einen benutzerdefinierten Prozentsatz zu verwenden. Minimum=0 Maximum=100 Standard=0
+        -- With random speed, the percentage of zombies that are sprinters.
+        -- Min=0 Max=100 Default=0
         SprinterPercentage = 0,
-        -- Steuert den Schaden den Zombies pro Angriff verursachen. Standard=Normal
-        -- 1 = Übermenschlich
-        -- 2 = Normal
-        -- 3 = Schwach
-        -- 4 = zufällig
+        -- Damage a zombie deals per attack. Default=Normal
+        -- 1 = Superhuman, 2 = Normal, 3 = Weak, 4 = Random
         Strength = 2,
-        -- Steuert die Schwierigkeit, Zombies zu töten. Standard=zufällig
-        -- 1 = Zäh
-        -- 2 = Normal
-        -- 3 = Zerbrechlich
-        -- 4 = zufällig
+        -- How hard zombies are to kill. Default=Random
+        -- 1 = Tough, 2 = Normal, 3 = Fragile, 4 = Random
         Toughness = 4,
-        -- Steuert wie sich der Zombievirus ausbreitet. Standard=Blut + Speichel
-        -- 1 = Blut + Speichel
-        -- 2 = Nur Speichel
-        -- 3 = Jeder ist Infiziert
-        -- 4 = Keine
+        -- How the virus spreads. Default=Blood and saliva
+        -- 1 = Blood and saliva, 2 = Saliva only, 3 = Everyone is infected, 4 = None
         Transmission = 1,
-        -- Steuert wie schnell die Infektion wirksam wird. Standard=2-3 Tage
-        -- 1 = Sofort
-        -- 2 = 0-30 Sekunden
-        -- 3 = 0-1 Minute
-        -- 4 = 0-12 Stunden
-        -- 5 = 2-3 Tage
-        -- 6 = 1-2 Wochen
-        -- 7 = Nie
+        -- How quickly the infection takes effect. Default=2-3 days
+        -- 1 = Instant, 2 = 0-30 seconds, 3 = 0-1 minute, 4 = 0-12 hours, 5 = 2-3 days,
+        -- 6 = 1-2 weeks, 7 = Never
         Mortality = 5,
-        -- Steuert wie schnell sich Leichen als Zombies erheben. Standard=0-1 Minute
-        -- 1 = Sofort
-        -- 2 = 0-30 Sekunden
-        -- 3 = 0-1 Minute
-        -- 4 = 0-12 Stunden
-        -- 5 = 2-3 Tage
-        -- 6 = 1-2 Wochen
+        -- How quickly corpses rise as zombies. Default=0-1 minute
+        -- 1 = Instant, 2 = 0-30 seconds, 3 = 0-1 minute, 4 = 0-12 hours, 5 = 2-3 days,
+        -- 6 = 1-2 weeks
         Reanimate = 3,
-        -- Steuert die Zombie-Intelligenz. Standard=Einfache Navigation
-        -- 1 = Navigieren + Verwendung von Türen
-        -- 2 = Navigieren
-        -- 3 = Einfache Navigation
-        -- 4 = zufällig
+        -- Zombie intelligence. Default=Basic navigation
+        -- 1 = Navigate and use doors, 2 = Navigate, 3 = Basic navigation, 4 = Random
         Cognition = 3,
-        -- Minimum=0 Maximum=100 Standard=0
+        -- Min=0 Max=100 Default=0
         DoorOpeningPercentage = 0,
-        -- Steuert welche Zombies unter Fahrzeuge kriechen können. Standard=Oft
-        -- 1 = Nie
-        -- 2 = Sehr selten
-        -- 3 = Selten
-        -- 4 = Manchmal
-        -- 5 = Oft
-        -- 6 = Sehr oft
-        -- 7 = Immer
+        -- Which zombies can crawl under vehicles. Default=Often
+        -- 1 = Never, 2 = Very rare, 3 = Rare, 4 = Sometimes, 5 = Often, 6 = Very often,
+        -- 7 = Always
         CrawlUnderVehicle = 5,
-        -- Steuert wie lange sich Zombies an Spieler erinnern, nachdem sie sie gesehen oder gehört haben. Standard=Normal
-        -- 1 = Lang
-        -- 2 = Normal
-        -- 3 = Kurz
-        -- 4 = Keine
-        -- 5 = Zufällig
-        -- 6 = Zufällig zwischen Normal und Keine
+        -- How long zombies remember a player after seeing or hearing them. Default=Normal
+        -- 1 = Long, 2 = Normal, 3 = Short, 4 = None, 5 = Random,
+        -- 6 = Random between normal and none
         Memory = 2,
-        -- Steuert den Sichtradius von Zombies. Standard=Zufällig zwischen Normal und Schlecht
-        -- 1 = Adleraugen
-        -- 2 = Normal
-        -- 3 = Schlecht
-        -- 4 = Zufällig
-        -- 5 = Zufällig zwischen Normal und Schlecht
+        -- Zombie sight radius. Default=Random between normal and poor
+        -- 1 = Eagle eyed, 2 = Normal, 3 = Poor, 4 = Random,
+        -- 5 = Random between normal and poor
         Sight = 5,
-        -- Steuert den Hörradius von Zombies. Standard=Zufällig zwischen Normal und Schlecht
-        -- 1 = Sehr gut
-        -- 2 = Normal
-        -- 3 = Schlecht
-        -- 4 = Zufällig
-        -- 5 = Zufällig zwischen Normal und Schlecht
+        -- Zombie hearing radius. Default=Random between normal and poor
+        -- 1 = Pinpoint, 2 = Normal, 3 = Poor, 4 = Random,
+        -- 5 = Random between normal and poor
         Hearing = 5,
-        -- Aktiviert die neue fortschrittliche Tarnungsmechanik, die es dir ermöglicht, dich vor Zombies hinter Autos zu verstecken, Eigenschaften und Wetter zu berücksichtigen uvm.
+        -- Enables the advanced concealment mechanic: hiding behind cars, traits and weather
+        -- being taken into account, and more.
         SpottedLogic = true,
-        -- Zombies greifen Türen und Konstruktionen an während sie umherwandern, wenn keine Spieler zu Sehen/Hören sind.
+        -- Wandering zombies attack doors and constructions when no player is seen or heard.
         ThumpNoChasing = false,
-        -- Bestimmt ob Zombies, Spieler-Konstruktionen und Verteidigungen zerstören können oder nicht.
+        -- Zombies can destroy player-built constructions and defences.
         ThumpOnConstruction = true,
-        -- Gibt an, ob Zombies während des Tages oder bei Nacht vermehrt aktiv sind. Inaktive Zombies werden langsamer und neigen nicht dazu auf Jagd zu gehen. Standard=Beides
-        -- 1 = Beides
-        -- 2 = Nacht
-        -- 3 = Tag
+        -- When zombies are more active. Inactive zombies move slower and are less likely to
+        -- hunt. Default=Both
+        -- 1 = Both, 2 = Night, 3 = Day
         ActiveOnly = 1,
-        -- Ermöglicht Zombies, Hausalarme auszulösen, wenn sie durch Fenster und Türen brechen.
+        -- Zombies can set off house alarms when breaking through windows and doors.
         TriggerHouseAlarm = true,
-        -- Wenn aktiviert können mehrere Zombies dich bei ihrem Angriff herunterziehen zum fressen. Abhängig von Stärke der Zombies.
+        -- Several zombies can drag the player down while attacking, depending on their
+        -- strength.
         ZombiesDragDown = true,
-        -- Bestimmt, ob Kriecher-Zombies in der Nähe eines Spielers dazu beitragen, von einer Zombiegruppe heruntergezogen und getötet zu werden.
+        -- Crawlers near a player also help drag them down.
         ZombiesCrawlersDragDown = false,
-        -- Wenn diese Funktion aktiviert ist, haben Zombies die Möglichkeit, nach dem Spieler zu greifen, nachdem sie über einen Zaun geklettert sind, wenn Sie zu nahe sind.
+        -- Zombies can lunge at the player after climbing a fence if the player stands too
+        -- close.
         ZombiesFenceLunge = true,
-        -- Dient als Multiplikator bei der Bestimmung der Wirksamkeit der von Zombies getragenen Rüstung. Minimum=0,00 Maximum=100,00 Standard=2,00
+        -- Multiplier for the effectiveness of armour worn by zombies.
+        -- Min=0.00 Max=100.00 Default=2.00
         ZombiesArmorFactor = 2.0,
-        -- Der maximale Verteidigungsprozentsatz, den eine getragene Schutzbekleidung einem Zombie bieten kann. Minimum=0 Maximum=100 Standard=85
+        -- Maximum defence percentage that worn protective clothing can give a zombie.
+        -- Min=0 Max=100 Default=85
         ZombiesMaxDefense = 85,
-        -- Prozentuale Chance, eine zufällig angebrachte Waffe zu haben. Minimum=0 Maximum=100 Standard=6
+        -- Percentage chance of a zombie carrying a randomly attached weapon.
+        -- Min=0 Max=100 Default=6
         ChanceOfAttachedWeapon = 6,
-        -- Wie viel Schaden Zombies nehmen, wenn sie aus der Höhe fallen. Minimum=0,00 Maximum=100,00 Standard=1,00
+        -- Damage zombies take when falling from a height.
+        -- Min=0.00 Max=100.00 Default=1.00
         ZombiesFallDamage = 1.0,
-        -- Bestimmt, ob einige tot aussehende Zombies wiederbelebt werden und den Spieler angreifen. Standard=Einige Zombies auf der Welt werden vorgeben, tot zu sein
-        -- 1 = Einige Zombies auf der Welt werden vorgeben, tot zu sein
-        -- 2 = Einige Zombies auf der Welt, sowie einige, die Sie „töten“, können vorgeben, tot zu sein
-        -- 3 = Zombies werden niemals vorgeben, tot zu sein
+        -- Whether some seemingly dead zombies revive and attack.
+        -- Default=Some zombies in the world play dead
+        -- 1 = Some zombies in the world play dead,
+        -- 2 = Some in the world, and some you 'kill', can play dead,
+        -- 3 = Zombies never play dead
         DisableFakeDead = 1,
-        -- Zombies werden nicht dort spawnen, wo Spieler spawnen. Standard=Im Gebäude und drumherum
-        -- 1 = Im Gebäude und drumherum
-        -- 2 = Im Gebäude
-        -- 3 = Im Raum
-        -- 4 = Zombies können überall spawnen
+        -- Where zombies are kept from spawning around player spawn points.
+        -- Default=In and around the building
+        -- 1 = In and around the building, 2 = In the building, 3 = In the room,
+        -- 4 = Zombies can spawn anywhere
         PlayerSpawnZombieRemoval = 1,
-        -- How many zombies it takes to damage a tall fence. Minimum=-1 Maximum=100 Standard=25
+        -- How many zombies it takes to damage a tall fence. Min=-1 Max=100 Default=25
         FenceThumpersRequired = 25,
-        -- How quickly zombies damage tall fences. Minimum=0,01 Maximum=100,00 Standard=1,00
+        -- How quickly zombies damage tall fences. Min=0.01 Max=100.00 Default=1.00
         FenceDamageMultiplier = 1.0,
     },
+    -- Zombie population management.
+    -- Zombie population management.
     ZombieConfig = {
-        -- Identisch mit der Einstellung unter Sandbox \Zombie Anzahl\. 4.0 Verrückt Minimum=0,00 Maximum=4,00 Standard=0,65
+        -- The same as the sandbox zombie count setting, where 4.0 equals insane.
+        -- Min=0.00 Max=4.00 Default=0.65
         PopulationMultiplier = 0.65,
-        -- Zum Einstellen der gewünschten Bevölkerung zu Beginn des Spiels. Minimum=0,00 Maximum=4,00 Standard=1,00
+        -- Desired population at the start of the game. Min=0.00 Max=4.00 Default=1.00
         PopulationStartMultiplier = 1.0,
-        -- Zum Einstellen der gewünschten Bevölkerungsdichte an einem 'Höhepunkt-Tag'. Minimum=0,00 Maximum=4,00 Standard=1,50
+        -- Desired population density on the peak day. Min=0.00 Max=4.00 Default=1.50
         PopulationPeakMultiplier = 1.5,
-        -- Der Tag, an dem die Bevölkerungsdichte ihren Höhepunkt erreicht. Minimum=1 Maximum=365 Standard=28
+        -- The day on which the population reaches its peak. Min=1 Max=365 Default=28
         PopulationPeakDay = 28,
-        -- Anzahl der Stunden die verstreichen müssen, bevor Zombies in einer Zelle wiedererscheinen. Null bedeutet, deaktiviert Minimum=0,00 Maximum=8760,00 Standard=0,00
+        -- Hours that must pass before zombies respawn in a cell. 0 disables respawning.
+        -- Min=0.00 Max=8760.00 Default=0.00
         RespawnHours = 0.0,
-        -- Anzahl der Stunden in der eine Zelle ungesehen bleiben muss, bevor Zombies wiedererscheinen. Minimum=0,00 Maximum=8760,00 Standard=0,00
+        -- Hours a cell must stay unseen before zombies respawn in it.
+        -- Min=0.00 Max=8760.00 Default=0.00
         RespawnUnseenHours = 0.0,
-        -- Der Bruchteil einer Zelle mit der gewünschten Bevölkerungsdichte, die alle 'Wiedererschein-Stunden' aufgestellt werden können. Minimum=0,00 Maximum=1,00 Standard=0,00
+        -- Fraction of a cell's desired population that may be placed at every respawn
+        -- interval. Min=0.00 Max=1.00 Default=0.00
         RespawnMultiplier = 0.0,
-        -- Anzahl der Stunden die verstreichen müssen bevor Zombies wandern um Teile der Zelle zu leeren. Minimum=0,00 Maximum=8760,00 Standard=12,00
+        -- Hours that must pass before zombies wander to fill emptied parts of a cell.
+        -- Min=0.00 Max=8760.00 Default=12.00
         RedistributeHours = 12.0,
-        -- Der Abstand zum letzten gehörten Geräusch zu dem virtuelle Zombies wandern. Minimum=10 Maximum=1000 Standard=100
+        -- Distance virtual zombies travel towards the last sound they heard.
+        -- Min=10 Max=1000 Default=100
         FollowSoundDistance = 100,
-        -- Die Gruppenstärke von echten Zombies die sich im Leerlauf bilden. Null bedeutet, Zombies bilden keine Gruppen. Gruppen bilden sich nicht innerhalb von Gebäuden oder Waldzonen. Minimum=0 Maximum=1000 Standard=20
+        -- Size of the groups idle real zombies form. 0 means no groups. Groups do not form
+        -- inside buildings or forest zones. Min=0 Max=1000 Default=20
         RallyGroupSize = 20,
-        -- Prozentsatz, um den die Größe von Zombie-Gruppen von der Standardgröße abweichen kann (sowohl größer als auch kleiner).   Bei einer Varianz von 50 % und einer Standardgruppengröße von 20 variiert die Gruppengröße beispielsweise zwischen 10 und 30. Minimum=0 Maximum=100 Standard=50
+        -- Percentage by which group size may deviate from the standard size, in both
+        -- directions. At 50 percent variance and a standard size of 20, groups range from
+        -- 10 to 30. Min=0 Max=100 Default=50
         RallyGroupSizeVariance = 50,
-        -- Entfernungen die echte Zombies im Leerlauf reisen um Gruppen zu bilden. Minimum=5 Maximum=50 Standard=20
+        -- Distance idle real zombies travel in order to form groups. Min=5 Max=50 Default=20
         RallyTravelDistance = 20,
-        -- Der Abstand zwischen den Zombiegruppen. Minimum=5 Maximum=25 Standard=15
+        -- Distance kept between zombie groups. Min=5 Max=25 Default=15
         RallyGroupSeparation = 15,
-        -- Die Distanz zwischen Mitglieder und dem Anführer der Gruppe. Minimum=1 Maximum=10 Standard=3
+        -- Distance between group members and their leader. Min=1 Max=10 Default=3
         RallyGroupRadius = 3,
-        -- Controls the maximum number of zombies tracked before cleanup occurs. 0 means zombies will not be cleaned up. The default value (300) is strongly recommended. Increasing this value or setting to 0 may cause severe performance problems. For troubleshooting and bug-report purposes, please reproduce any issue with the default setting before submitting a report. Minimum=0 Maximum=5000 Standard=300
+        -- Maximum number of tracked zombies before cleanup happens. 0 disables cleanup.
+        -- The default of 300 is strongly recommended; higher values, or 0, can cause severe
+        -- performance problems. Min=0 Max=5000 Default=300
         ZombiesCountBeforeDelete = 300,
     },
+    -- XP rate per skill.
+    -- XP rate per skill.
     MultiplierConfig = {
-        -- Bestimmt die Rate, mit der sich alle Fähigkeiten entwickeln. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which all skills level up. Min=0.00 Max=1000.00 Default=1.00
         Global = 1.0,
-        -- Wenn diese Option aktiviert wird, werden alle Fähigkeiten den globalen Multiplikator verwenden.
+        -- When enabled, every skill uses the global multiplier.
         GlobalToggle = true,
-        -- Bestimmt die Rate, mit der sich die Fitness-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Fitness skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Fitness = 1.0,
-        -- Bestimmt die Rate, mit der sich die Stärke-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Strength skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Strength = 1.0,
-        -- Bestimmt die Rate, mit der sich die Sprint-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Sprinting skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Sprinting = 1.0,
-        -- Bestimmt die Rate, mit der sich die Leichtfüßig-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Lightfooted skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Lightfoot = 1.0,
-        -- Bestimmt die Rate, mit der sich die Flink-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Nimble skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Nimble = 1.0,
-        -- Bestimmt die Rate, mit der sich die Schleichen-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Sneaking skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Sneak = 1.0,
-        -- Bestimmt die Rate, mit der sich die Axt-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Axe skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Axe = 1.0,
-        -- Bestimmt die Rate, mit der sich die Stumpfwaffen-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Long blunt skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Blunt = 1.0,
-        -- Bestimmt die Rate, mit der sich die Kurze-Stumpfwaffe-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Short blunt skill levels up. Min=0.00 Max=1000.00 Default=1.00
         SmallBlunt = 1.0,
-        -- Bestimmt die Rate, mit der sich die Lange-Klingenwaffe-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Long blade skill levels up. Min=0.00 Max=1000.00 Default=1.00
         LongBlade = 1.0,
-        -- Bestimmt die Rate, mit der sich die Kurze-Klingenwaffe-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Short blade skill levels up. Min=0.00 Max=1000.00 Default=1.00
         SmallBlade = 1.0,
-        -- Bestimmt die Rate, mit der sich die Speer-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Spear skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Spear = 1.0,
-        -- Bestimmt die Rate, mit der sich die Instandhaltungs-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Maintenance skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Maintenance = 1.0,
-        -- Bestimmt die Rate, mit der sich die Tischlerei-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Carpentry skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Woodwork = 1.0,
-        -- Bestimmt die Rate, mit der sich die Kochen-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Cooking skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Cooking = 1.0,
-        -- Bestimmt die Rate, mit der sich die Landwirtschaft-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Farming skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Farming = 1.0,
-        -- Bestimmt die Rate, mit der sich die Erste-Hilfe-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the First aid skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Doctor = 1.0,
-        -- Bestimmt die Rate, mit der sich die Elektrotechnik-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Electrical skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Electricity = 1.0,
-        -- Bestimmt die Rate, mit der sich die Schweißen-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Welding skill levels up. Min=0.00 Max=1000.00 Default=1.00
         MetalWelding = 1.0,
-        -- Bestimmt die Rate, mit der sich die Kfz-Mechanik-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Mechanics skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Mechanics = 1.0,
-        -- Bestimmt die Rate, mit der sich die Schneidern-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Tailoring skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Tailoring = 1.0,
-        -- Bestimmt die Rate, mit der sich die Zielen-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Aiming skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Aiming = 1.0,
-        -- Bestimmt die Rate, mit der sich die Nachladen-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Reloading skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Reloading = 1.0,
-        -- Bestimmt die Rate, mit der sich die Angeln-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Fishing skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Fishing = 1.0,
-        -- Bestimmt die Rate, mit der sich die Fallenstellen-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Trapping skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Trapping = 1.0,
-        -- Bestimmt die Rate, mit der sich die Nahrungssuche-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Foraging skill levels up. Min=0.00 Max=1000.00 Default=1.00
         PlantScavenging = 1.0,
-        -- Bestimmt die Rate, mit der sich die Feuersteinbearbeitung-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Flint knapping skill levels up. Min=0.00 Max=1000.00 Default=1.00
         FlintKnapping = 1.0,
-        -- Bestimmt die Rate, mit der sich die Maurerei-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Masonry skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Masonry = 1.0,
-        -- Bestimmt die Rate, mit der sich die Töpferei-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Pottery skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Pottery = 1.0,
-        -- Bestimmt die Rate, mit der sich die Schnitzen-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Carving skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Carving = 1.0,
-        -- Bestimmt die Rate, mit der sich die Tierpflege-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Animal care skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Husbandry = 1.0,
-        -- Bestimmt die Rate, mit der sich die Spurensuche-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Tracking skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Tracking = 1.0,
-        -- Bestimmt die Rate, mit der sich die Metallbearbeitung-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Metalworking skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Blacksmith = 1.0,
-        -- Bestimmt die Rate, mit der sich die Schlachtung-Fähigkeit entwickelt. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Butchering skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Butchering = 1.0,
-        -- Rate at which Glassmaking skill levels up. Minimum=0,00 Maximum=1000,00 Standard=1,00
+        -- Rate at which the Glassmaking skill levels up. Min=0.00 Max=1000.00 Default=1.00
         Glassmaking = 1.0,
     },
 }

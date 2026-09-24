@@ -3,11 +3,13 @@
 
 Usage:
     gamemaster add zomboid [-u|--username USERNAME] [-d|--installdir DIRECTORY]
-                           [--port PORT] [--udp-port PORT] [--rcon-port PORT]
+                           [-P|--port PORT] [-U|--udp-port PORT]
+                           [-R|--rcon-port PORT]
     gamemaster install zomboid [-u|--username USERNAME]
                                [-d|--installdir DIRECTORY]
-                               [--port PORT] [--udp-port PORT] [--rcon-port PORT]
-                               [--beta BRANCH]
+                               [-P|--port PORT] [-U|--udp-port PORT]
+                               [-R|--rcon-port PORT] [-b|--beta BRANCH]
+    gamemaster agent [-l|--list]
     gamemaster -h | --help
 
 "add zomboid" registers an EXISTING Project Zomboid server with GameMaster.
@@ -536,18 +538,21 @@ def add_server_options(parser: argparse.ArgumentParser) -> None:
              f"(default: PZ_SERVER_INSTALL_DIR from {ZOMBOID_TEMPLATE_FILE})",
     )
     parser.add_argument(
+        "-P",
         "--port",
         metavar="PORT",
         default=None,
         help="udp port the players connect to (default: from the template)",
     )
     parser.add_argument(
+        "-U",
         "--udp-port",
         metavar="PORT",
         default=None,
         help="second udp port of the server (default: from the template)",
     )
     parser.add_argument(
+        "-R",
         "--rcon-port",
         metavar="PORT",
         default=None,
@@ -660,6 +665,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_server_options(install_zomboid_parser)
     install_zomboid_parser.add_argument(
+        "-b",
         "--beta",
         metavar="BRANCH",
         default=None,
@@ -671,6 +677,7 @@ def build_parser() -> argparse.ArgumentParser:
         "agent", help="the keys the agent user may log in with"
     )
     agent_parser.add_argument(
+        "-l",
         "--list",
         dest="list_only",
         action="store_true",
