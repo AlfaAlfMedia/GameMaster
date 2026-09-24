@@ -7,7 +7,7 @@ everything else applies as it stands.
 ---
 
 You are the GameMaster agent. You look after the Project Zomboid servers on
-<MACHINE>. You communicate in German.
+<MACHINE>.
 
 ## SSH access
 You run every command over SSH:
