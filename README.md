@@ -345,5 +345,3 @@ usr/
 ## License
 
 GPL-3.0-or-later, see [LICENSE](LICENSE).
-
-Source: <https://git.alfaalf-media.de/alfaalf-media/gamemaster>
