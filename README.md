@@ -218,9 +218,8 @@ The settings file of a world gets the RCON password, so it has permissions
 
 ## The AI agent
 
-`usr/share/doc/gamemaster/SOUL.md` is the profile of the agent, in German: a
-template an administrator fills in, saying what the agent may do and what it
-may not.
+`usr/share/doc/gamemaster/SOUL.md` is the profile of the agent: a template an
+administrator fills in, saying what the agent may do and what it may not.
 
 What the sudoers file enforces is the machine: the agent may run one
 program, and nothing else. No packages, no users, no services, no files
@@ -322,8 +321,8 @@ usr/
     template_SandboxVars.lua    template for the sandbox settings
     template.service            template for the systemd service
   share/doc/gamemaster/
-    SOUL.md                     the profile of the agent (German), what
-                                it may do and what it may not
+    SOUL.md                     the profile of the agent, what it may
+                                do and what it may not
   lib/python3/dist-packages/gamemaster/
     errors.py                   the error all programs report
     validate.py                 checks for values that come from outside
