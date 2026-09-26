@@ -1,6 +1,7 @@
-# Template for the systemd service of one Project Zomboid server.
-# Written by 'zomboid world init'. Do not edit a generated unit by hand -
-# 'zomboid world switch' writes it again.
+# The systemd service of the Project Zomboid server of user @CONF_USER@.
+# Written by GameMaster ('zomboid world init', 'zomboid world switch',
+# 'zomboid service'), which replace it every time - do not edit it by hand.
+# Commands of your own go into /etc/gamemaster/zomboid/@CONF_USER@.conf.
 
 [Unit]
 Description=Project Zomboid Dedicated Server (@USER@, world @WORLD@)
