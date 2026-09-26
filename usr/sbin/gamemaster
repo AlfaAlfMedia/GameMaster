@@ -14,7 +14,9 @@ Usage:
 
 "add zomboid" registers an EXISTING Project Zomboid server with GameMaster.
 It does not create the Linux user and it does not install the server. It
-only writes the file /etc/gamemaster/zomboid/USERNAME.conf.
+writes the file /etc/gamemaster/zomboid/USERNAME.conf. Without -d the
+server is looked for in the default directory, then in the home directory
+of the user and two levels below it.
 
 "install zomboid" installs a Project Zomboid server with SteamCMD and then
 registers it like "add zomboid". The Linux user is created if it does not
@@ -91,6 +93,45 @@ def check_install_dir(install_dir: str) -> str:
             f"({SERVER_SCRIPT} is missing)."
         )
     return install_dir
+
+
+# Where below the home of a user a server is looked for when 'add zomboid'
+# is not told the directory: the home itself and two levels below it
+SEARCH_PATTERNS = (SERVER_SCRIPT, f"*/{SERVER_SCRIPT}", f"*/*/{SERVER_SCRIPT}")
+
+
+def find_install_dir(default: str, home: Path) -> str:
+    """Return the directory of the one installed server to be found.
+
+    First the default directory of the template, then the home directory
+    of the server user and two levels below it. More than one server, or
+    none, is an error that says what to do instead.
+    """
+    if has_server(default):
+        return default
+
+    found = sorted({
+        str(script.parent)
+        for pattern in SEARCH_PATTERNS
+        for script in home.glob(pattern)
+        if script.is_file()
+    })
+
+    if len(found) == 1:
+        print(f"Found the Project Zomboid server in {found[0]}.")
+        return found[0]
+
+    if found:
+        raise GameMasterError(
+            f"There is more than one Project Zomboid server below {home}: "
+            f"{', '.join(found)}. Use -d/--installdir to name the one to register."
+        )
+
+    raise GameMasterError(
+        f"No Project Zomboid server found in {default} or below {home}. "
+        f"Use -d/--installdir to name its directory, or 'gamemaster install "
+        f"zomboid' to install one."
+    )
 
 
 def get_default_username(settings: dict[str, str]) -> str:
@@ -446,12 +487,15 @@ def add_zomboid(arguments: argparse.Namespace) -> None:
     settings = context.read_settings(GAMEMASTER_CONF_FILE)
     template = context.read_template(ZOMBOID_TEMPLATE_FILE)
     username = check_username(arguments.username or get_default_username(settings))
+    check_not_registered(username)
     install_dir = check_install_dir(
-        arguments.installdir or get_default_install_dir(template)
+        arguments.installdir
+        or find_install_dir(
+            get_default_install_dir(template), Path(pwd.getpwnam(username).pw_dir)
+        )
     )
     branch = validate.parse_branch(get_setting(settings, "PZ_DEFAULT_BRANCH"))
     agent = get_agent_user(settings)
-    check_not_registered(username)
 
     ports = choose_ports(template, arguments)
 
@@ -526,8 +570,8 @@ def add_server_options(parser: argparse.ArgumentParser) -> None:
         "--installdir",
         metavar="DIRECTORY",
         default=None,
-        help=f"directory of the server "
-             f"(default: PZ_SERVER_INSTALL_DIR from {ZOMBOID_TEMPLATE_FILE})",
+        help=f"directory of the server (default: PZ_SERVER_INSTALL_DIR from "
+             f"{ZOMBOID_TEMPLATE_FILE}; 'add' also looks in the home of the user)",
     )
     parser.add_argument(
         "-P",

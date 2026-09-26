@@ -112,7 +112,7 @@ Options of `install zomboid` and `add zomboid`:
 | Short | Long | Meaning |
 |---|---|---|
 | `-u` | `--username USERNAME` | Linux user that runs the server (default: `PZ_DEFAULT_USER`) |
-| `-d` | `--installdir DIRECTORY` | directory of the server (default: `PZ_SERVER_INSTALL_DIR` from the template) |
+| `-d` | `--installdir DIRECTORY` | directory of the server (default: `PZ_SERVER_INSTALL_DIR` from the template; `add` also looks in the home of the user) |
 | `-P` | `--port PORT` | udp port the players connect to |
 | `-U` | `--udp-port PORT` | second udp port of the server |
 | `-R` | `--rcon-port PORT` | port of the remote console |
@@ -125,6 +125,11 @@ Options of `agent`:
 |---|---|---|
 | `-l` | `--list` | only show the keys, do not ask for one |
 | `-h` | `--help` | show the help |
+
+Without `-d`, `add zomboid` looks for `start-server.sh` in the default
+directory, then in the home directory of the user and two levels below it.
+If it finds exactly one server it takes that one and says so; if it finds
+several or none, it asks for `-d`.
 
 A port another registered server already uses is refused. Without the
 matching option the program then offers the next free one.
