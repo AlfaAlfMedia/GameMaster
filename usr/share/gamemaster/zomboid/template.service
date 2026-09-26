@@ -13,10 +13,18 @@ User=@USER@
 Group=@USER@
 WorkingDirectory=@INSTALL_DIR@
 
-# Fetch a new version of the server before it starts.
-#   +  run this as root, not as the server user: it reads the settings of
-#      the server, which only root may read
-#   -  a failed update must not keep the server from starting
+# Whatever the server creates may be read by its group, and changed where
+# the group is allowed to; files the agent must not see are closed again
+# by fix-permissions before the next start
+UMask=0007
+
+# Before the server starts: give its files back to it, then fetch a new
+# version of the server.
+#   +  run this as root, not as the server user: fix-permissions changes the
+#      owner of files, and update reads the settings of the server, which
+#      only root may read
+#   -  neither may keep the server from starting when it fails
+ExecStartPre=-+/usr/sbin/zomboid -u @CONF_USER@ fix-permissions
 ExecStartPre=-+/usr/sbin/zomboid -u @CONF_USER@ update
 
 ExecStart=@INSTALL_DIR@/start-server.sh -servername @WORLD@

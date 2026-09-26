@@ -1,10 +1,15 @@
 """Knowledge about a Project Zomboid server: its worlds and its commands."""
 
+import os
+import pwd
 import shutil
+from contextlib import ExitStack
 from pathlib import Path
 from typing import NamedTuple
 
-from gamemaster import configfile, context, process, service, steamcmd, validate
+from gamemaster import (
+    configfile, context, permissions, process, service, steamcmd, validate,
+)
 from gamemaster.errors import GameMasterError
 from gamemaster.rcon import Rcon, RconError, quoted
 
@@ -167,10 +172,11 @@ def rcon_for_world(data_dir: Path, worldname: str) -> ZomboidRcon:
     """
     ini_file = world_ini_file(data_dir, worldname)
 
-    try:
-        settings = configfile.read_values(ini_file.read_text(encoding="utf-8-sig"))
-    except OSError as error:
-        raise GameMasterError(f"Could not read {ini_file}: {error}") from error
+    # Read as root from a directory the agent may write in, so a link in
+    # place of the file is not followed
+    settings = configfile.read_values(
+        permissions.read_text(ini_file, encoding="utf-8-sig")
+    )
 
     source = str(ini_file)
     port = validate.parse_port(
@@ -190,7 +196,6 @@ ZOMBOID_ETC_DIR = context.ETC_DIR / "zomboid"
 DEFAULT_USER_KEY = "PZ_DEFAULT_USER"
 
 SERVER_USER_KEY = "PZ_SERVER_USER"
-DATA_DIR_KEY = "PZ_SERVER_DATA_DIR"
 INSTALL_DIR_KEY = "PZ_SERVER_INSTALL_DIR"
 ADMIN_PASSWORD_KEY = "PZ_SERVER_ADMIN_PASSWORD"
 BRANCH_KEY = "PZ_SERVER_BRANCH"
@@ -228,6 +233,22 @@ def username_of(given: str | None) -> str:
     return validate.parse_username(default)
 
 
+# Project Zomboid keeps everything in this directory below the home of the
+# user it runs as; there is no setting for it
+DATA_SUBDIR = "Zomboid"
+
+
+def data_dir_of(server_user: str) -> Path:
+    """Return the directory the server of this Linux user keeps its data in."""
+    try:
+        home = pwd.getpwnam(server_user).pw_dir
+    except KeyError:
+        raise GameMasterError(
+            f"The Linux user '{server_user}' does not exist."
+        ) from None
+    return Path(home) / DATA_SUBDIR
+
+
 def load(given_username: str | None) -> Server:
     """Return the registered server of a user, with all values checked."""
     username = username_of(given_username)
@@ -241,13 +262,14 @@ def load(given_username: str | None) -> Server:
 
     values = context.read_settings(conf_file)
     source = str(conf_file)
+    server_user = validate.parse_username(
+        configfile.require(values, SERVER_USER_KEY, source)
+    )
 
     return Server(
         username=username,
-        server_user=validate.parse_username(
-            configfile.require(values, SERVER_USER_KEY, source)
-        ),
-        data_dir=Path(configfile.require(values, DATA_DIR_KEY, source)),
+        server_user=server_user,
+        data_dir=data_dir_of(server_user),
         install_dir=Path(
             validate.parse_install_dir(
                 configfile.require(values, INSTALL_DIR_KEY, source)
@@ -392,11 +414,6 @@ INI_FROM_CONF = {
 
 PORT_KEYS = ("RCONPort", "DefaultPort", "UDPPort")
 
-# The server user and its group may read and write, nobody else. The ini
-# file holds the RCON password, so it must not be readable for everyone.
-FILE_MODE = 0o660
-DIRECTORY_MODE = 0o770
-
 
 def world_paths(data_dir: Path, worldname: str) -> tuple[Path, Path, Path]:
     """Return the three parts of a world: ini file, sandbox file, save dir."""
@@ -408,41 +425,66 @@ def world_paths(data_dir: Path, worldname: str) -> tuple[Path, Path, Path]:
     )
 
 
-def _hand_over(path: Path, owner: str, mode: int) -> None:
-    """Give a path to its owner and group, and set the permissions."""
+# ---------------------------------------------------------------------------
+# Owner and permissions of the data directory
+# ---------------------------------------------------------------------------
+
+# Everything below ~/Zomboid belongs to the server user and its group. The
+# agent is a member of that group, and what it may do depends on the part of
+# the directory:
+#
+#   Server/   the settings of the worlds          the agent may change them
+#   Saves/    the worlds themselves               the agent may change them,
+#                                                 e.g. to put a backup back
+#   mods/     mods that do not come from Steam    the agent may add them
+#   db/       accounts and passwords of a world   only the server
+#   the rest  logs, backups, what the server      the agent may read it
+#             keeps for itself
+#
+# Anything new that a later version of the game adds falls under "the rest".
+GROUP_WRITABLE_SUBDIRS = ("Server", "Saves", "mods")
+PRIVATE_SUBDIRS = (DATABASE_SUBDIR,)
+
+
+def data_modes(names: tuple[str, ...]) -> permissions.Modes:
+    """Return the permissions of a path below the data directory."""
+    if names:
+        if names[0] in PRIVATE_SUBDIRS:
+            return permissions.PRIVATE
+        if names[0] in GROUP_WRITABLE_SUBDIRS:
+            return permissions.GROUP_WRITABLE
+    return permissions.GROUP_READABLE
+
+
+def owner_of(server: Server) -> permissions.Owner:
+    """Return the user and group the files of this server belong to."""
     try:
-        shutil.chown(path, user=owner, group=owner)
-        path.chmod(mode)
-    except (OSError, LookupError) as error:
+        account = pwd.getpwnam(server.server_user)
+    except KeyError:
         raise GameMasterError(
-            f"Could not set owner or permissions of {path}: {error}"
-        ) from error
+            f"The Linux user '{server.server_user}' does not exist."
+        ) from None
+    return permissions.Owner(account.pw_uid, account.pw_gid)
 
 
-def _create_file(path: Path, content: str, owner: str) -> None:
-    """Write a file that must not exist yet, and hand it to its owner."""
-    try:
-        # Mode 'x' fails if the file is there, so a world is never overwritten
-        with open(path, "x", encoding="utf-8") as new_file:
-            new_file.write(content)
-    except FileExistsError:
-        raise GameMasterError(f"{path} already exists.") from None
-    except OSError as error:
-        raise GameMasterError(f"Could not write {path}: {error}") from error
+def fix_permissions(server: Server) -> permissions.Report | None:
+    """Give the data directory back to the server user, with the right modes.
 
-    _hand_over(path, owner, FILE_MODE)
+    Whoever touched the files last - the agent, root putting back a backup,
+    an editor that wrote a new file - afterwards they belong to the server
+    user and its group again. Returns None if there is no data directory yet.
+    """
+    home = server.data_dir.parent
 
+    # The agent reaches the data directory through the home directory
+    permissions.open_to_group(home)
 
-def _create_directory(path: Path, owner: str) -> None:
-    """Create a directory that must not exist yet, and hand it to its owner."""
-    try:
-        path.mkdir(parents=True)
-    except FileExistsError:
-        raise GameMasterError(f"{path} already exists.") from None
-    except OSError as error:
-        raise GameMasterError(f"Could not create {path}: {error}") from error
+    # Before the first world there is nothing to fix. A link in place of
+    # the directory counts as there, and fix_tree refuses it.
+    if not os.path.lexists(server.data_dir):
+        return None
 
-    _hand_over(path, owner, DIRECTORY_MODE)
+    return permissions.fix_tree(server.data_dir, owner_of(server), data_modes)
 
 
 def build_ini(template: str, worldname: str, server: Server) -> str:
@@ -461,48 +503,60 @@ def build_ini(template: str, worldname: str, server: Server) -> str:
     return content
 
 
-def prepare_data_dir(server: Server) -> None:
-    """Create the directories Project Zomboid keeps its data in.
-
-    The server builds them itself on its first start, but the files of the
-    first world have to be written before that ever happens.
-    """
-    for directory in (
-        server.data_dir,
-        server.data_dir / SERVER_SUBDIR,
-        server.data_dir / MULTIPLAYER_SUBDIR,
-    ):
-        if directory.is_dir():
-            continue
-        try:
-            directory.mkdir(parents=True, exist_ok=True)
-        except OSError as error:
-            raise GameMasterError(
-                f"Could not create {directory}: {error}"
-            ) from error
-        _hand_over(directory, server.server_user, DIRECTORY_MODE)
-
-
 def create_world_files(server: Server, worldname: str) -> tuple[Path, Path, Path]:
     """Create the ini file, the sandbox file and the save directory.
 
     Those three are all a world needs before its first start. Everything
     else is created by the server itself when the world is initialised.
+    Missing directories on the way are created as well: the server builds
+    them on its first start, but the files of the first world have to be
+    written before that ever happens.
     """
-    prepare_data_dir(server)
-
     ini_file, sandbox_file, save_dir = world_paths(server.data_dir, worldname)
-
-    for path in (ini_file, sandbox_file, save_dir):
-        if path.exists():
-            raise GameMasterError(f"The world '{worldname}' already exists: {path}")
 
     ini_content = build_ini(context.read_template(INI_TEMPLATE), worldname, server)
     sandbox_content = context.read_template(SANDBOX_TEMPLATE)
 
-    _create_file(ini_file, ini_content, server.server_user)
-    _create_file(sandbox_file, sandbox_content, server.server_user)
-    _create_directory(save_dir, server.server_user)
+    owner = owner_of(server)
+    server_names = (SERVER_SUBDIR,)
+    save_names = tuple(Path(MULTIPLAYER_SUBDIR).parts)
+
+    def directory_mode(names: tuple[str, ...]) -> int:
+        return data_modes(names).directory
+
+    with ExitStack() as stack:
+        def enter(parent_fd: int, names: tuple[str, ...], mode_for) -> int:
+            fd = permissions.make_directories(parent_fd, names, owner, mode_for)
+            return stack.enter_context(permissions.opened(fd))
+
+        home_fd = stack.enter_context(
+            permissions.opened(permissions.open_directory(server.data_dir.parent))
+        )
+        # The data directory itself is the empty path of the policy
+        data_fd = enter(home_fd, (server.data_dir.name,),
+                        lambda _names: directory_mode(()))
+        server_fd = enter(data_fd, server_names, directory_mode)
+        saves_fd = enter(data_fd, save_names, directory_mode)
+
+        for parent_fd, path in (
+            (server_fd, ini_file),
+            (server_fd, sandbox_file),
+            (saves_fd, save_dir),
+        ):
+            try:
+                os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            raise GameMasterError(f"The world '{worldname}' already exists: {path}")
+
+        file_mode = data_modes(server_names).file
+        permissions.create_file(server_fd, ini_file.name, ini_content, owner, file_mode)
+        permissions.create_file(
+            server_fd, sandbox_file.name, sandbox_content, owner, file_mode
+        )
+        permissions.make_directory(
+            saves_fd, save_dir.name, owner, directory_mode(save_names)
+        )
 
     return ini_file, sandbox_file, save_dir
 
@@ -538,24 +592,6 @@ def prepare_log_directory(server: Server) -> Path:
             f"Could not prepare {directory}: {error}"
         ) from error
     return directory
-
-
-def secure_database(server: Server, worldname: str) -> Path | None:
-    """Take the database of a world away from everyone but its server.
-
-    The server creates it world readable and world writable, and the admin
-    password of the world is kept in it. Only the server user and its group
-    have any business there.
-    """
-    database = server.data_dir / DATABASE_SUBDIR / f"{worldname}.db"
-    if not database.is_file():
-        return None
-
-    if database.stat().st_mode & 0o777 == FILE_MODE:
-        return None
-
-    _hand_over(database, server.server_user, FILE_MODE)
-    return database
 
 
 def build_unit(server: Server, worldname: str) -> str:

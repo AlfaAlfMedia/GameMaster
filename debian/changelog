@@ -1,3 +1,22 @@
+gamemaster (0.1.6) unstable; urgency=medium
+
+  * New command 'zomboid fix-permissions': gives everything below ~/Zomboid
+    back to the server user. Server/, Saves/ and mods/ may be changed by the
+    agent, db/ belongs to the server alone, the rest may be read. Links are
+    never followed, only reported.
+  * The service runs fix-permissions before every start and the server with
+    UMask=0007. Units written by an older version do not have this yet;
+    'zomboid world switch' to the loaded world writes them again.
+  * 'gamemaster add' and 'install' put the data directory in order.
+  * The agent user gets umask 0007 through pam_umask (GECOS field).
+  * Files and directories are created as root without following links;
+    the database of a world is no longer open to the agent.
+  * The data directory is taken from the home of the server user;
+    PZ_SERVER_DATA_DIR is no longer read.
+  * First unit tests.
+
+ -- AlfaAlf <git@alfaalf-media.de>  Sat, 26 Sep 2026 16:00:00 +0200
+
 gamemaster (0.1.5) unstable; urgency=medium
 
   * First package. Sets a machine up with 'gamemaster' and runs Project

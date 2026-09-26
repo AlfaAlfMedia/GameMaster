@@ -16,6 +16,15 @@ case "$1" in
                     --gecos "GameMaster agent" \
                     "$AGENT_USER"
         fi
+
+        # What the agent creates in the directory of a server must be
+        # usable by the server's group. pam_umask takes the umask of a
+        # login from the GECOS field; an umask set there already is kept.
+        gecos=$(getent passwd "$AGENT_USER" | cut -d: -f5)
+        case ",$gecos," in
+            *,umask=*) ;;
+            *) usermod --comment "${gecos:+$gecos,}umask=0007" "$AGENT_USER" ;;
+        esac
         ;;
 esac
 

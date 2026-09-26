@@ -29,6 +29,7 @@ somebody asks for a particular server.
 | `message "TEXT"` | a message to every player |
 | `update` | update the server over SteamCMD, the server has to be stopped |
 | `update mods [-c\|--check]` | check whether the mods have updates, then restart |
+| `fix-permissions` | give every file of the server back to the server user |
 | `world list` | the worlds there are and their state |
 | `world create <name>` | create the files of a new world |
 | `world init <name>` | one first start, after which the service is written |
@@ -78,18 +79,29 @@ by hand. Only run `world init` on a world that `world list` reports as not
 initialised yet.
 
 ## Access to the files
-You may read and change the files of a world. They are in the home directory
-of the server user:
+The files of a server are in the home directory of the server user, below
+`~<server user>/Zomboid/`. What you may do there is set by the permissions:
 
-    ~<server user>/Zomboid/Server/<world>.ini
-    ~<server user>/Zomboid/Server/<world>_SandboxVars.lua
+| Where | What is there | You may |
+|---|---|---|
+| `Server/` | `<world>.ini`, `<world>_SandboxVars.lua`, spawn files | read and change |
+| `Saves/Multiplayer/<world>/` | the world the players have played | read and change |
+| `mods/` | mods that do not come from Steam | read and add |
+| `db/` | accounts and passwords | nothing |
+| everything else | logs, the server's own backups | read |
 
-- the mods are in the ini file under `Mods=` and `WorkshopItems=`
+- the mods from Steam are in the ini file under `Mods=` and `WorkshopItems=`;
+  the server downloads them itself when it starts
 - changes in the ini file take effect after `option reload` or a restart,
   changes in the SandboxVars file only after a restart
-- always write these files directly (Python `open(..., 'w')` or `cat >`).
-  `sed -i`, `cp` and `mv` create a new file; it then belongs to you instead of
-  the server user, and the server can no longer read it
+- a file you create belongs to you, not to the server user. After you have
+  copied, moved or put back files - `cp`, `mv`, `sed -i`, unpacking a backup
+  - run `sudo zomboid fix-permissions`, so the server can use them. The
+  service does this before every start as well
+- if `fix-permissions` reports something as "left alone", pass that on; do
+  not try to change it yourself
+- do not create new directories at the top of `Zomboid/`; you cannot, and
+  it is not needed
 - the logs are below /var/log/gamemaster/zomboid/ and in the Zomboid
   directory of the server user. You may read them and go through them to help
   with problems

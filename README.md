@@ -15,6 +15,7 @@ The first supported game is **Project Zomboid**.
 - [Command reference](#command-reference)
 - [Multiple servers and multiple worlds](#multiple-servers-and-multiple-worlds)
 - [Configuration](#configuration)
+- [Permissions](#permissions)
 - [The AI agent](#the-ai-agent)
 - [How it works](#how-it-works)
 - [Project layout](#project-layout)
@@ -35,6 +36,8 @@ The first supported game is **Project Zomboid**.
   its mods
 - list, kick and ban players, and give them permission levels
 - read and change the server options of a running world
+- keep the files of a server usable for the server and the agent, whoever
+  touched them last
 - give an AI agent exactly these commands over SSH and sudo, and nothing else
 
 ## Requirements
@@ -147,6 +150,7 @@ used.
 | `zomboid message TEXT` | send a message to every player |
 | `zomboid update` | update the server with SteamCMD (server must be stopped) |
 | `zomboid update mods [-c\|--check]` | let the server fetch its mods again; `--check` only asks whether an update is waiting |
+| `zomboid fix-permissions` | give every file below `~/Zomboid` back to the server user, with the permissions below |
 | `zomboid world list` | the worlds of this server and their state |
 | `zomboid world create NAME` | create the ini file, the sandbox file and the save directory |
 | `zomboid world init NAME` | first start, then write the service |
@@ -216,6 +220,48 @@ belongs to `root`.
 The settings file of a world gets the RCON password, so it has permissions
 `0660` and belongs to the server user and its group.
 
+## Permissions
+
+Everything below `~/Zomboid` belongs to the server user and its group. The
+agent user is a member of that group, and what it may do depends on the
+part of the directory:
+
+| Where | What is there | Group | Files | Directories |
+|---|---|---|---|---|
+| `Server/` | settings of the worlds, sandbox and spawn files | read, write | `0660` | `2770` |
+| `Saves/` | the worlds | read, write | `0660` | `2770` |
+| `mods/` | mods that do not come from Steam | read, write | `0660` | `2770` |
+| `db/` | accounts and passwords of the worlds | nothing | `0600` | `0700` |
+| everything else | logs, the server's backups, its own files | read | `0640` | `2750` |
+
+`~/Zomboid` itself is `2750`, so nothing new can be put at its top by
+anyone but the server. Whatever a later version of the game adds there
+counts as "everything else". The home directory of the server user is
+opened to its group (`g+rx`), otherwise nothing below it could be reached.
+
+The permissions are kept that way from four sides:
+
+- `zomboid fix-permissions` sets them on the whole directory. The service
+  runs it before every start, `zomboid world init` after the first start,
+  and `gamemaster add` and `install` when a server is registered. After
+  files were copied or put back by hand it can be run at any time.
+- the setgid bit on the directories gives everything created inside the
+  group of the server, whoever creates it
+- the service runs the server with `UMask=0007`, so what it creates can be
+  read by its group
+- the agent user gets the umask `0007` through `pam_umask`: the package
+  writes `umask=0007` into its GECOS field. That covers logins over SSH. An
+  agent that runs on the same machine as a service needs `UMask=0007` in
+  its own unit instead; it also has to be restarted after a new server was
+  registered, because a running process does not see new groups.
+
+`fix-permissions` runs as root in a directory other users may write in, so
+it never follows a link: every directory is entered and every file opened
+with `O_NOFOLLOW`, and owner and permissions are changed on the open file.
+Symbolic links, hard links and special files are left alone and reported,
+as is a link like `Logs -> /var/log/zomboid`. If `~/Zomboid` itself is a
+link, nothing is changed and the command fails.
+
 ## The AI agent
 
 `usr/share/doc/gamemaster/SOUL.md` is the profile of the agent: a template an
@@ -269,10 +315,12 @@ world of a running server is written down. `zomboid status` reads it back
 from the command line of the running process, which is why it also
 recognises a server that was set up by hand.
 
-Before the server starts, the service updates it: `ExecStartPre` calls
-`zomboid update`. It runs as root, because the settings of a server may only
-be read by root, and a failed update does not keep the server from starting.
-SteamCMD can take a while, so the service allows half an hour for its start.
+Before the server starts, the service gives its files back to it and
+updates it: `ExecStartPre` calls `zomboid fix-permissions`, then `zomboid
+update`. Both run as root - the one changes owners, the other reads the
+settings of the server, which only root may read - and neither keeps the
+server from starting when it fails. SteamCMD can take a while, so the
+service allows half an hour for its start.
 
 `zomboid world init` is the only place in the whole program where a server is
 started by hand. Everything after that goes through systemd.
@@ -332,9 +380,18 @@ usr/
     process.py                  the running processes of a Linux user
     service.py                  writing and controlling a systemd service
     steamcmd.py                 installing and updating with SteamCMD
+    permissions.py              handing files to a user without following
+                                links
     sshkey.py                   public keys and authorized_keys
     rcon.py                     the Source RCON protocol
     zomboid.py                  worlds and commands of a Zomboid server
+tests/                          unit tests, not part of the package
+```
+
+The tests need no root:
+
+```
+PYTHONPATH=usr/lib/python3/dist-packages python3 -m unittest discover tests
 ```
 
 ## Roadmap

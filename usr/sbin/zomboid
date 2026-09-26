@@ -19,6 +19,7 @@ world - everything is written below ~/Zomboid.
     zomboid message "TEXT"            send a message to every player
     zomboid update                    update the server with SteamCMD
     zomboid update mods [-c|--check]  let the server fetch its mods again
+    zomboid fix-permissions           give the files back to the server user
 
     zomboid world list                worlds of this server and their state
     zomboid world create NAME         create ini, sandbox file and save dir
@@ -283,6 +284,28 @@ def update_mods_command(server: zomboid.Server, arguments: argparse.Namespace) -
     bring_up(server)
 
 
+def report_permissions(server: zomboid.Server) -> None:
+    """Fix owner and permissions of the data directory and say what happened."""
+    result = zomboid.fix_permissions(server)
+
+    if result is None:
+        context.report(f"{server.data_dir} does not exist yet, nothing to fix")
+        return
+
+    context.report(f"permissions of {server.data_dir}: {result.changed} changed")
+    for skipped in result.skipped:
+        context.report(f"left alone: {skipped.path} ({skipped.reason})")
+
+
+def fix_permissions_command(server: zomboid.Server, _arguments: argparse.Namespace) -> None:
+    """Give every file of the server back to the server user and its group.
+
+    Run by the service before every start, and whenever files were copied,
+    moved or put back from a backup by someone else.
+    """
+    report_permissions(server)
+
+
 # -- worlds -----------------------------------------------------------------
 
 
@@ -446,9 +469,9 @@ def run_first_start(server: zomboid.Server, worldname: str) -> None:
             "playable. See the log file."
         )
 
-    database = zomboid.secure_database(server, worldname)
-    if database is not None:
-        context.report(f"database closed to others: {database}")
+    # The server has just created the database and much else, readable for
+    # everyone; from now on it is sorted like the rest
+    report_permissions(server)
 
     context.report(f"world '{worldname}' initialised")
 
@@ -607,6 +630,11 @@ def build_parser() -> argparse.ArgumentParser:
     message.set_defaults(action=message_command)
 
     add_update_commands(commands)
+
+    commands.add_parser(
+        "fix-permissions", help="give the files back to the server user"
+    ).set_defaults(action=fix_permissions_command)
+
     add_world_commands(commands)
     add_player_commands(commands)
     add_option_commands(commands)

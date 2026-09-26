@@ -34,7 +34,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from gamemaster import configfile, context, sshkey, steamcmd, validate
+from gamemaster import configfile, context, sshkey, steamcmd, validate, zomboid
 from gamemaster.errors import GameMasterError
 
 ZOMBOID_ETC_DIR = context.ETC_DIR / "zomboid"
@@ -118,34 +118,26 @@ def get_default_install_dir(template: str) -> str:
     )
 
 
-def open_home_to_group(username: str) -> None:
-    """Let the group of the server user enter its home directory.
+def fix_data_dir(username: str) -> None:
+    """Give the files of the server to its user, sorted the GameMaster way.
 
     The worlds and the logs of a server live below its home directory, and
-    the agent reads them as a member of that user's group. A home that only
-    its owner may enter would make every one of those files unreachable, no
-    matter what the files themselves allow.
+    the agent works on them as a member of that user's group. A server that
+    was set up by hand, or files that were copied in, would otherwise keep
+    whatever owner and permissions they happened to get. This also opens
+    the home directory to the group, without which nothing below it could
+    be reached.
     """
-    home = Path(pwd.getpwnam(username).pw_dir)
+    server = zomboid.load(username)
+    result = zomboid.fix_permissions(server)
 
-    try:
-        mode = home.stat().st_mode & 0o777
-    except OSError as error:
-        raise GameMasterError(f"Could not look at {home}: {error}") from error
-
-    # Group needs r-x: x to enter the directory, r to list what is in it
-    wanted = mode | 0o050
-    if wanted == mode:
+    if result is None:
+        print(f"{server.data_dir} does not exist yet; the first world creates it.")
         return
 
-    try:
-        home.chmod(wanted)
-    except OSError as error:
-        raise GameMasterError(
-            f"Could not open {home} to the group '{username}': {error}"
-        ) from error
-
-    print(f"Opened {home} to the group '{username}' (now {wanted:04o}).")
+    print(f"Permissions of {server.data_dir}: {result.changed} changed.")
+    for skipped in result.skipped:
+        print(f"  left alone: {skipped.path} ({skipped.reason})")
 
 
 def add_user_to_group(username: str, group: str) -> None:
@@ -352,7 +344,7 @@ def register_zomboid(
 ) -> None:
     """Write the configuration of the server and let the agent read its files."""
     write_zomboid_config(template, username, install_dir, branch, ports)
-    open_home_to_group(username)
+    fix_data_dir(username)
     add_agent_to_group(username, agent)
 
 
