@@ -1,5 +1,0 @@
-# The systemd units of the servers are written by 'zomboid world init', not
-# shipped by this package. deb-systemd-helper only knows about units a
-# package installs, so on purge they have to be stopped and removed with
-# systemctl directly.
-gamemaster: maintainer-script-calls-systemctl

@@ -5,3 +5,11 @@ __pycache__/
 *.changes
 *~
 *.swp
+
+# Written by dpkg-buildpackage on every build
+debian/gamemaster/
+debian/.debhelper/
+debian/files
+debian/*.debhelper.log
+debian/*.substvars
+debian/debhelper-build-stamp
