@@ -13,6 +13,13 @@ gamemaster (0.1.6) unstable; urgency=medium
     the database of a world is no longer open to the agent.
   * The data directory is taken from the home of the server user;
     PZ_SERVER_DATA_DIR is no longer read.
+  * The configuration of a server can add ExecStartPre, ExecStartPost and
+    ExecStopPost commands to its service (PZ_EXEC_START_PRE_1 and so on).
+    A command run as root is only accepted when it and every directory
+    above it can be changed by root alone; /etc/gamemaster/hooks is there
+    for such scripts.
+  * New command 'zomboid service': writes the service again from the
+    configuration without stopping the server.
   * First unit tests.
 
  -- AlfaAlf <git@alfaalf-media.de>  Sat, 26 Sep 2026 16:00:00 +0200

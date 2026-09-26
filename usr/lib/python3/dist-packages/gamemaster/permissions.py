@@ -379,3 +379,80 @@ def _open_same(
         return None
 
     return fd
+
+
+# ---------------------------------------------------------------------------
+# Programs root may run
+# ---------------------------------------------------------------------------
+
+# How many links may be followed on the way to a program
+MAXIMUM_LINKS = 40
+
+
+def require_root_only(program: Path) -> Path:
+    """Return the real path of a program only root can change, or raise.
+
+    A program that runs as root must be safe from everyone else: the file
+    must belong to root and be writable by root alone, and so must every
+    directory on the way to it - whoever may write in a directory can put
+    another file in place of the program. Links on the way are followed,
+    and both the link and where it leads are checked the same way.
+    """
+    real = _trusted(Path(program), 0)
+
+    status = os.stat(real)
+    if not stat.S_ISREG(status.st_mode) or not status.st_mode & stat.S_IXUSR:
+        raise PermissionsError(f"{program} is not an executable file.")
+
+    return real
+
+
+def _trusted(path: Path, links: int) -> Path:
+    """Walk to path from /, checking every step; return where it leads."""
+    if not path.is_absolute():
+        raise PermissionsError(f"{path} is not an absolute path.")
+
+    current = Path("/")
+    _require_root_only_entry(current)
+
+    for name in path.parts[1:]:
+        candidate = current / name
+        try:
+            status = os.lstat(candidate)
+        except OSError as error:
+            raise PermissionsError(f"{candidate}: {error.strerror}") from error
+
+        if stat.S_ISLNK(status.st_mode):
+            # The link itself can only be changed by whoever may write in
+            # current, which was checked already. Where it leads is checked
+            # from the start.
+            links += 1
+            if links > MAXIMUM_LINKS:
+                raise PermissionsError(f"{path}: too many links on the way.")
+            target = Path(os.readlink(candidate))
+            current = _trusted(
+                Path(os.path.normpath(current / target)), links
+            )
+            continue
+
+        _require_root_only_entry(candidate, status)
+        current = candidate
+
+    return current
+
+
+def _require_root_only_entry(path: Path, status: os.stat_result | None = None) -> None:
+    """Raise unless path belongs to root and nobody else may write to it."""
+    if status is None:
+        status = os.lstat(path)
+
+    if status.st_uid != 0:
+        raise PermissionsError(
+            f"{path} does not belong to root, so a command run as root may "
+            "not depend on it."
+        )
+    if status.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        raise PermissionsError(
+            f"{path} may be changed by others than root, so a command run as "
+            "root may not depend on it."
+        )

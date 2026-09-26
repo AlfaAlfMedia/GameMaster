@@ -151,6 +151,7 @@ used.
 | `zomboid update` | update the server with SteamCMD (server must be stopped) |
 | `zomboid update mods [-c\|--check]` | let the server fetch its mods again; `--check` only asks whether an update is waiting |
 | `zomboid fix-permissions` | give every file below `~/Zomboid` back to the server user, with the permissions below |
+| `zomboid service` | write the systemd service again from the configuration; applies from the next start |
 | `zomboid world list` | the worlds of this server and their state |
 | `zomboid world create NAME` | create the ini file, the sandbox file and the save directory |
 | `zomboid world init NAME` | first start, then write the service |
@@ -219,6 +220,34 @@ belongs to `root`.
 
 The settings file of a world gets the RCON password, so it has permissions
 `0660` and belongs to the server user and its group.
+
+### Commands of your own in the service
+
+The configuration of a server can add commands to its systemd service, for
+example to set up firewall rules before the server starts:
+
+```
+PZ_EXEC_START_PRE_1=+/etc/gamemaster/hooks/setup-snat.sh $PZ_SERVER_PORT $PZ_UDP_PORT
+PZ_EXEC_START_POST_1=/usr/local/bin/notify-started
+PZ_EXEC_STOP_POST_1=-+/etc/gamemaster/hooks/remove-snat.sh
+```
+
+They become `ExecStartPre`, `ExecStartPost` and `ExecStopPost` lines of the
+unit. Numbers from 1 upwards allow more than one of a kind, and set their
+order; `ExecStartPre` commands run after GameMaster's own. A leading `+` runs
+the command as root, a leading `-` lets the server start even if the command
+fails. Settings of the configuration can be passed on as `$NAME`.
+
+A command run as root must belong to root and be writable by root alone,
+and so must every directory above it; otherwise the unit is not written.
+Whoever may write in one of those directories could put a program of their
+own in its place and have it run as root at the next start. Scripts of
+this kind belong in `/etc/gamemaster/hooks/`, which the package creates.
+Purging the package removes them along with the rest of `/etc/gamemaster`.
+
+The unit is written by `zomboid world init` and `zomboid world switch`.
+After changing these settings, `zomboid service` writes it again without
+touching the running server; the change applies from its next start.
 
 ## Permissions
 
@@ -355,6 +384,8 @@ etc/
   gamemaster/
     gamemaster.conf             general settings, default user, agent user
     zomboid/<user>.conf         one file per registered server
+    hooks/                      scripts of the administrator that the
+                                services run as root
   sudoers.d/gamemaster          what the agent user is allowed to run
 usr/
   sbin/

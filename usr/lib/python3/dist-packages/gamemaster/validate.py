@@ -21,10 +21,10 @@ WORLDNAME_RULE = (
     "at most 32 characters"
 )
 
-# The path ends up in a configuration file that is read back later, so
-# quotes, spaces and shell metacharacters are kept out.
-INSTALL_DIR_PATTERN = re.compile(r"/[A-Za-z0-9._/-]+")
-INSTALL_DIR_RULE = (
+# Paths end up in configuration and unit files that are read back later,
+# so quotes, spaces and shell metacharacters are kept out.
+ABSOLUTE_PATH_PATTERN = re.compile(r"/[A-Za-z0-9._/-]*")
+ABSOLUTE_PATH_RULE = (
     "an absolute path built from letters, digits, dot, underscore, hyphen "
     "and slash"
 )
@@ -97,12 +97,17 @@ def parse_address(text: str) -> str:
         raise ValidationError(f"{text!r} is not a network address.") from None
 
 
+def parse_absolute_path(text: str) -> str:
+    """Return an absolute path without trailing slashes and without '..'."""
+    path = _checked(text.rstrip("/"), ABSOLUTE_PATH_PATTERN, ABSOLUTE_PATH_RULE)
+    if not path or ".." in path.split("/"):
+        raise ValidationError(f"{text!r} is not allowed: use {ABSOLUTE_PATH_RULE}, without '..'.")
+    return path
+
+
 def parse_install_dir(text: str) -> str:
     """Return the install directory without trailing slashes."""
-    directory = _checked(text.rstrip("/"), INSTALL_DIR_PATTERN, INSTALL_DIR_RULE)
-    if ".." in directory:
-        raise ValidationError(f"{text!r} is not allowed: '..' is not permitted.")
-    return directory
+    return parse_absolute_path(text)
 
 
 def parse_branch(text: str) -> str:

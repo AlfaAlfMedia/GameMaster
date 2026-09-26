@@ -20,6 +20,7 @@ world - everything is written below ~/Zomboid.
     zomboid update                    update the server with SteamCMD
     zomboid update mods [-c|--check]  let the server fetch its mods again
     zomboid fix-permissions           give the files back to the server user
+    zomboid service                   write the service again from the settings
 
     zomboid world list                worlds of this server and their state
     zomboid world create NAME         create ini, sandbox file and save dir
@@ -306,6 +307,27 @@ def fix_permissions_command(server: zomboid.Server, _arguments: argparse.Namespa
     report_permissions(server)
 
 
+def service_command(server: zomboid.Server, _arguments: argparse.Namespace) -> None:
+    """Write the service again, with the settings as they are now.
+
+    Needed after the commands in the configuration of the server were
+    changed. The running server is left alone; the new service applies
+    from its next start.
+    """
+    name = require_unit(server)
+    worldname = zomboid.unit_world(server)
+    if worldname is None:
+        raise GameMasterError(
+            f"The service {name}.service does not say which world to load."
+        )
+
+    path = zomboid.install_unit(server, worldname)
+    context.report(f"service written: {path} (world '{worldname}')")
+
+    if service.is_active(name):
+        context.report("the server is running; the new service applies from its next start")
+
+
 # -- worlds -----------------------------------------------------------------
 
 
@@ -407,6 +429,10 @@ def init_world_command(server: zomboid.Server, arguments: argparse.Namespace) ->
 
     zomboid.require_stopped(server, "initialise a world")
 
+    # The service is written at the very end; a mistake in its settings
+    # should show before the server has been started and stopped for nothing
+    zomboid.unit_hooks(server)
+
     playable, created = zomboid.find_worlds(server.data_dir)
     if worldname in playable:
         context.report(f"world '{worldname}' is already initialised")
@@ -488,6 +514,10 @@ def switch_world_command(server: zomboid.Server, arguments: argparse.Namespace) 
         )
 
     require_unit(server)
+
+    # Before the server is stopped: a mistake in the settings of the service
+    # must not leave it down
+    zomboid.unit_hooks(server)
 
     if zomboid.find_running_server(server.server_user) is not None:
         bring_down(server)
@@ -634,6 +664,9 @@ def build_parser() -> argparse.ArgumentParser:
     commands.add_parser(
         "fix-permissions", help="give the files back to the server user"
     ).set_defaults(action=fix_permissions_command)
+    commands.add_parser(
+        "service", help="write the service again from the settings"
+    ).set_defaults(action=service_command)
 
     add_world_commands(commands)
     add_player_commands(commands)

@@ -27,6 +27,10 @@ UMask=0007
 ExecStartPre=-+/usr/sbin/zomboid -u @CONF_USER@ fix-permissions
 ExecStartPre=-+/usr/sbin/zomboid -u @CONF_USER@ update
 
+# Commands the administrator added in the configuration of this server
+# (PZ_EXEC_START_PRE_1 and so on). 'zomboid service' writes them in again.
+@HOOKS@
+
 ExecStart=@INSTALL_DIR@/start-server.sh -servername @WORLD@
 
 # The server is stopped over RCON, which saves the world first. Systemd

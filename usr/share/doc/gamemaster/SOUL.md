@@ -30,6 +30,7 @@ somebody asks for a particular server.
 | `update` | update the server over SteamCMD, the server has to be stopped |
 | `update mods [-c\|--check]` | check whether the mods have updates, then restart |
 | `fix-permissions` | give every file of the server back to the server user |
+| `service` | write the systemd service again after the administrator changed its settings |
 | `world list` | the worlds there are and their state |
 | `world create <name>` | create the files of a new world |
 | `world init <name>` | one first start, after which the service is written |

@@ -1,2 +1,3 @@
+etc/gamemaster/hooks
 etc/gamemaster/zomboid
 var/log/gamemaster/zomboid
