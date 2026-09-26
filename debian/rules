@@ -8,7 +8,7 @@ override_dh_fixperms:
 	dh_fixperms
 	chmod 0440 debian/gamemaster/etc/sudoers.d/gamemaster
 
-# SOUL.md is meant to be copied into the profile of an agent, so it must
-# stay readable and not end up as a gzip file
+# SOUL.md and the skills are meant to be copied to an agent, so they must
+# stay readable and not end up as gzip files
 override_dh_compress:
-	dh_compress -X SOUL.md
+	dh_compress -X SOUL.md -X SKILL.md

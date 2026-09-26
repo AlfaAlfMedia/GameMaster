@@ -298,8 +298,39 @@ link, nothing is changed and the command fails.
 
 ## The AI agent
 
-`usr/share/doc/gamemaster/SOUL.md` is the profile of the agent: a template an
-administrator fills in, saying what the agent may do and what it may not.
+Two things tell an agent how to work with GameMaster. Both are installed
+below `/usr/share/doc/gamemaster/` and meant to be copied to the agent:
+
+- `SOUL.md` is the profile of the agent: who it is, how it reaches the
+  machine, which commands and files it may use, and what it must not do. It
+  is a template; the administrator fills in the parts in angle brackets.
+- `skills/` holds the procedures, one folder per task, each with a
+  `SKILL.md`:
+
+  | Skill | Task |
+  |---|---|
+  | `zomboid-world-switch` | load another world, with a warning to the players |
+  | `zomboid-new-world` | create a world, enter its settings, first start |
+  | `zomboid-mods` | find mods, enter or remove them, check they loaded |
+  | `zomboid-restore` | put a backup of a world back without deleting the current state |
+  | `zomboid-troubleshoot` | where the logs are, what to look for, common causes |
+  | `zomboid-knowledge` | power and water, network addresses, what "running" means |
+
+The profile is read with every message; a skill only when a task needs it.
+That keeps the profile short. The skills follow the common `SKILL.md`
+format (a name and a description in a YAML header, the procedure below).
+For [Hermes Agent](https://hermes-agent.nousresearch.com/) the files go
+into the profile of the agent:
+
+```
+~/.hermes/profiles/<profile>/SOUL.md
+~/.hermes/profiles/<profile>/skills/gameserver/zomboid-*/SKILL.md
+```
+
+Every skill then is also a command of its own in the chat, e.g.
+`/zomboid-mods`. Hermes can extend skills by itself from what it learns;
+look at them now and then to see that the rules of the profile still
+hold.
 
 What the sudoers file enforces is the machine: the agent may run one
 program, and nothing else. No packages, no users, no services, no files
@@ -407,6 +438,8 @@ usr/
   share/doc/gamemaster/
     SOUL.md                     the profile of the agent, what it may
                                 do and what it may not
+    skills/                     the procedures of the agent, one
+                                SKILL.md per task
   lib/python3/dist-packages/gamemaster/
     errors.py                   the error all programs report
     validate.py                 checks for values that come from outside

@@ -3,6 +3,9 @@ gamemaster (0.1.7) UNRELEASED; urgency=medium
   * 'gamemaster add zomboid' without -d looks for the server in the home
     directory of the user as well, and says what to do when it finds
     several or none.
+  * Skills for AI agents in /usr/share/doc/gamemaster/skills: switching
+    worlds, new worlds, mods, restoring a backup, troubleshooting, and
+    background knowledge. SOUL.md is shorter and points to them.
 
  -- AlfaAlf <git@alfaalf-media.de>  Sat, 26 Sep 2026 19:00:00 +0200
 
