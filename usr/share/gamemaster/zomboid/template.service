@@ -34,10 +34,15 @@ ExecStartPre=-+/usr/sbin/zomboid -u @CONF_USER@ update
 
 ExecStart=@INSTALL_DIR@/start-server.sh -servername @WORLD@
 
-# The server is stopped over RCON, which saves the world first. Systemd
-# only has to wait for it; it must not start it again by itself.
+# 'zomboid stop' stops the server over RCON, which saves the world first.
+# Systemd only has to wait for it; it must not start it again by itself.
 Restart=no
-KillSignal=SIGTERM
+
+# When systemd stops the server itself - 'systemctl stop', or the machine
+# shutting down - it sends SIGINT, the signal of Ctrl+C in a terminal, on
+# which the server saves the world and shuts down. After three minutes it
+# is killed.
+KillSignal=SIGINT
 TimeoutStopSec=180
 
 # SteamCMD may take a long time, and that time counts towards the start

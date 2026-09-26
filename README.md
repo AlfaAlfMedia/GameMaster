@@ -393,6 +393,11 @@ started by hand. Everything after that goes through systemd.
 `zomboid stop` does not kill the process: it saves the world over RCON, asks
 the server to quit, and waits until it is gone.
 
+When systemd stops the service itself - `systemctl stop`, or the machine
+shutting down - it sends `SIGINT`, the signal of Ctrl+C in a terminal, on
+which the server saves the world and shuts down. It has three minutes for
+that before it is killed.
+
 ### Structure of the code
 
 The programs in `usr/sbin` are thin. They read the command line, fetch their

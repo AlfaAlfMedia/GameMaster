@@ -6,6 +6,9 @@ gamemaster (0.1.7) UNRELEASED; urgency=medium
   * Skills for AI agents in /usr/share/doc/gamemaster/skills: switching
     worlds, new worlds, mods, restoring a backup, troubleshooting, and
     background knowledge. SOUL.md is shorter and points to them.
+  * The service stops the server with SIGINT, as Ctrl+C does, so it saves
+    the world when systemd stops it or the machine shuts down. Units
+    written by 0.1.6 get it with 'zomboid service'.
 
  -- AlfaAlf <git@alfaalf-media.de>  Sat, 26 Sep 2026 19:00:00 +0200
 

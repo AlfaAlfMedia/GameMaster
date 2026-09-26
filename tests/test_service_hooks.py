@@ -97,6 +97,13 @@ class UnitHooksTest(unittest.TestCase):
         self.assertNotIn("@", unit)
         self.assertIn("ExecStart=/opt/pzserver/start-server.sh -servername bonn", unit)
 
+    def test_stopped_like_ctrl_c(self) -> None:
+        # systemctl stop and a shutdown of the machine must let the server
+        # save first, as Ctrl+C does
+        lines = self.unit("").splitlines()
+        self.assertIn("KillSignal=SIGINT", lines)
+        self.assertNotIn("KillSignal=SIGTERM", lines)
+
     def test_hooks_in_order_after_gamemaster(self) -> None:
         unit = self.unit(
             "PZ_EXEC_START_PRE_10=/usr/bin/echo ten\n"
