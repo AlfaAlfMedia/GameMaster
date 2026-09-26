@@ -1,4 +1,4 @@
-gamemaster (0.1.7) UNRELEASED; urgency=medium
+gamemaster (0.1.7) unstable; urgency=medium
 
   * 'gamemaster add zomboid' without -d looks for the server in the home
     directory of the user as well, and says what to do when it finds
@@ -10,7 +10,7 @@ gamemaster (0.1.7) UNRELEASED; urgency=medium
     the world when systemd stops it or the machine shuts down. Units
     written by 0.1.6 get it with 'zomboid service'.
 
- -- AlfaAlf <git@alfaalf-media.de>  Sat, 26 Sep 2026 19:00:00 +0200
+ -- AlfaAlf <git@alfaalf-media.de>  Sat, 26 Sep 2026 19:15:00 +0200
 
 gamemaster (0.1.6) unstable; urgency=medium
 
