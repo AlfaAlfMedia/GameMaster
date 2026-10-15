@@ -2,7 +2,6 @@
 
 import os
 import pwd
-import re
 import shutil
 from contextlib import ExitStack
 from pathlib import Path
@@ -595,47 +594,14 @@ def prepare_log_directory(server: Server) -> Path:
     return directory
 
 
-# Commands the administrator adds to the service in the configuration of a
-# server, numbered from 1: PZ_EXEC_START_PRE_1, PZ_EXEC_START_PRE_2, ...
-# setting -> line in the unit
-HOOK_SETTINGS = {
-    "PZ_EXEC_START_PRE": "ExecStartPre",
-    "PZ_EXEC_START_POST": "ExecStartPost",
-    "PZ_EXEC_STOP_POST": "ExecStopPost",
-}
-
 HOOKS_MARKER = "@HOOKS@"
 
 
 def unit_hooks(server: Server) -> list[str]:
-    """Return the lines the administrator added to the service, checked.
-
-    A command that runs as root must be out of reach of everyone but root,
-    otherwise the server user - or anyone who takes it over - could put its
-    own program in its place and have it run as root at the next start.
-    """
-    values = context.read_settings(server.conf_file)
-    lines: list[str] = []
-
-    for setting, directive in HOOK_SETTINGS.items():
-        numbered: list[tuple[int, str, str]] = []
-        for key, value in values.items():
-            match = re.fullmatch(rf"{setting}_([0-9]+)", key)
-            if match and value.strip():
-                numbered.append((int(match[1]), key, value))
-
-        for _number, key, value in sorted(numbered):
-            try:
-                command = service.parse_command(value)
-                if command.as_root:
-                    permissions.require_root_only(command.program)
-            except GameMasterError as error:
-                raise GameMasterError(
-                    f"{key} in {server.conf_file}: {error}"
-                ) from error
-            lines.append(f"{directive}={command.line}")
-
-    return lines
+    """Return the lines the administrator added to the service, checked."""
+    return service.hook_lines(
+        context.read_settings(server.conf_file), "PZ", str(server.conf_file)
+    )
 
 
 def build_unit(server: Server, worldname: str) -> str:

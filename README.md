@@ -3,16 +3,18 @@
 Administration tools for game servers on Linux — run by an administrator, or
 by an AI agent through a narrow, explicitly granted set of commands.
 
-The first supported game is **Project Zomboid**.
+Supported games: **Project Zomboid** and **Valheim**.
 
-> **Status: in development.** The Debian package builds and installs, but
-> nothing has yet run against a real Project Zomboid server.
+> **Status: in development.** Project Zomboid runs under GameMaster on a
+> live server; Valheim is new in 0.2.0 and has only been tried on a test
+> machine.
 
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Quick start](#quick-start)
 - [Command reference](#command-reference)
+- [Valheim](#valheim)
 - [Multiple servers and multiple worlds](#multiple-servers-and-multiple-worlds)
 - [Configuration](#configuration)
 - [Permissions](#permissions)
@@ -24,18 +26,19 @@ The first supported game is **Project Zomboid**.
 
 ## Features
 
-- install a Project Zomboid server with SteamCMD, creating its Linux user if
-  needed, and register it
+- install a Project Zomboid or Valheim server with SteamCMD, creating its
+  Linux user if needed, and register it
 - register a server that is already installed, including its ports
 - run any number of servers on one machine, one Linux user per server, with
-  ports checked against every other registered server
+  ports checked against every other registered server, of either game
 - hold any number of worlds per server, one of them loaded at a time, and
   switch between them in a single command
 - create, initialise and list worlds
 - start, stop and save a server, message its players, update the server and
-  its mods
+  its mods (Project Zomboid; Valheim has no remote console, see
+  [Valheim](#valheim))
 - list, kick and ban players, and give them permission levels
-- read and change the server options of a running world
+- read and change the server options of a running world (Project Zomboid)
 - keep the files of a server usable for the server and the agent, whoever
   touched them last
 - give an AI agent exactly these commands over SSH and sudo, and nothing else
@@ -50,6 +53,8 @@ The first supported game is **Project Zomboid**.
   architecture `i386`; see the
   [SteamCMD documentation](https://developer.valvesoftware.com/wiki/SteamCMD#Linux).
 - one Linux user per game server
+- for Valheim: `libatomic1` and `libpulse0`, which its manual names as the
+  libraries the server needs beyond those of SteamCMD
 
 ## Installation
 
@@ -99,23 +104,24 @@ can be left out everywhere.
 ### `gamemaster` — set the machine up
 
 Run by a human, as root. It creates Linux users, installs servers and manages
-the keys of the agent user.
+the keys of the agent user. `GAME` is `zomboid` or `valheim`.
 
 | Command | Effect |
 |---|---|
-| `gamemaster install zomboid [options]` | install a server with SteamCMD and register it |
-| `gamemaster add zomboid [options]` | register a server that is already installed |
+| `gamemaster install GAME [options]` | install a server with SteamCMD and register it |
+| `gamemaster add GAME [options]` | register a server that is already installed |
 | `gamemaster agent [-l\|--list]` | show the keys the agent user may log in with, and add one |
 
-Options of `install zomboid` and `add zomboid`:
+Options of `install` and `add`. The settings named are those of Project
+Zomboid (`PZ_...`); for Valheim they begin with `VH_` instead:
 
 | Short | Long | Meaning |
 |---|---|---|
 | `-u` | `--username USERNAME` | Linux user that runs the server (default: `PZ_DEFAULT_USER`) |
 | `-d` | `--installdir DIRECTORY` | directory of the server (default: `PZ_SERVER_INSTALL_DIR` from the template; `add` also looks in the home of the user) |
-| `-P` | `--port PORT` | udp port the players connect to |
-| `-U` | `--udp-port PORT` | second udp port of the server |
-| `-R` | `--rcon-port PORT` | port of the remote console |
+| `-P` | `--port PORT` | udp port the players connect to; Valheim uses the next one as well |
+| `-U` | `--udp-port PORT` | second udp port of the server (Zomboid only) |
+| `-R` | `--rcon-port PORT` | port of the remote console (Zomboid only) |
 | `-b` | `--beta BRANCH` | install this beta branch (`install` only; default: `PZ_DEFAULT_BRANCH`) |
 | `-h` | `--help` | show the help |
 
@@ -126,19 +132,21 @@ Options of `agent`:
 | `-l` | `--list` | only show the keys, do not ask for one |
 | `-h` | `--help` | show the help |
 
-Without `-d`, `add zomboid` looks for `start-server.sh` in the default
-directory, then in the home directory of the user and two levels below it.
+Without `-d`, `add` looks for the server - `start-server.sh` for Project
+Zomboid, `valheim_server.x86_64` for Valheim - in the default directory,
+then in the home directory of the user and two levels below it.
 If it finds exactly one server it takes that one and says so; if it finds
 several or none, it asks for `-d`.
 
-A port another registered server already uses is refused. Without the
-matching option the program then offers the next free one.
+A port another registered server already uses is refused, whichever game
+it belongs to. Without the matching option the program then offers the
+next free one.
 
-`install zomboid` creates the Linux user if it does not exist, with a home
+`install` creates the Linux user if it does not exist, with a home
 directory and a group of its own; its password is asked for twice and is
 never taken from the command line. SteamCMD runs as that user, never as
 root, so the server belongs to the user from the start. If there is a server
-in the directory already, the program stops and points to `add zomboid`.
+in the directory already, the program stops and points to `add`.
 
 ### `zomboid` — run a server
 
@@ -174,6 +182,91 @@ used.
 
 Every command reports short lines on standard output and returns 0 or 1. On
 1 the last line begins with `ERROR:` and says what is wrong.
+
+## Valheim
+
+### Quick start
+
+```
+sudo gamemaster install valheim -u valheim          # user, install, register
+sudo nano /etc/gamemaster/valheim/valheim.conf      # name and password
+sudo valheim -u valheim world create Midgard        # the server creates the
+                                                    # world and starts
+sudo valheim -u valheim status
+```
+
+### What is different
+
+Valheim has no remote console, so GameMaster cannot ask the running server
+anything or tell it anything. Instead:
+
+- whether the server is up is read from its log: it is running once it has
+  written `Game server connected` after its latest start
+- who is online is read from the log as well, from the lines the server
+  writes when a player connects, spawns and disconnects
+- there is no `save`, `message` or `kick`. The server saves every half hour
+  and when it gets `SIGINT`, which is how systemd stops it
+- bans and rights are set in the three list files of the server, which it
+  reads again when they change
+- a world needs no first start of its own: the server creates a world when
+  it starts with a name it does not know yet
+
+The world, the port and the other settings are given on the command line
+of the server, in the `ExecStart` line of `valheim-<user>.service`. The
+name and the password of the server go into `/etc/gamemaster/valheim/<user>.env`,
+which only root may read, and from there into the command line, so they
+are not in the unit file, which everyone may read. While the server runs
+they can still be seen in the list of processes: the server takes them in
+no other way.
+
+### `valheim` — run a server
+
+Run as root, by a human or by the agent. Every command takes
+`-u|--username USERNAME`; without it `VH_DEFAULT_USER` is used.
+
+| Command | Effect |
+|---|---|
+| `valheim status` | is a server running, which world, which players |
+| `valheim start` | start the service and wait until the server can be joined |
+| `valheim stop` | let the server save and shut down |
+| `valheim update` | update the server with SteamCMD (server must be stopped) |
+| `valheim fix-permissions` | give the files of the server back to its user, with the permissions below |
+| `valheim service` | write the service again from the configuration; applies from the next start |
+| `valheim world list` | the worlds of this server |
+| `valheim world create NAME` | point the service at a new world and start it, which creates the world |
+| `valheim world switch NAME` | let the service load another world |
+| `valheim player list` | the players that are connected, with their IDs |
+| `valheim player lists` | the admins, the banned and the permitted players |
+| `valheim player ban ID` / `unban ID` | the list of banned players |
+| `valheim player admin ID` / `unadmin ID` | the list of admins |
+| `valheim player permit ID` / `unpermit ID` | the list of permitted players; once anybody is on it, only they may join |
+
+A player ID is the platform and the ID on it, as `Steam_76561198000000000`,
+the way the server writes it into its log and its lists.
+
+### Configuration
+
+`/etc/gamemaster/valheim/<user>.conf` holds the name and the password of
+the server, whether it is public, whether it uses crossplay, its port, how
+often it saves and keeps backups, and the install directory and Steam
+branch. After a change, `valheim service` writes the service again; it
+applies from the next start. Commands of your own in the service work as
+for Project Zomboid, with `VH_EXEC_START_PRE_1` and so on.
+
+### Permissions
+
+The server keeps its worlds and lists in the default place of the game,
+`~/.config/unity3d/IronGate/Valheim`:
+
+| Where | What is there | Group | Files | Directories |
+|---|---|---|---|---|
+| `worlds_local/` | the worlds and the server's backups of them | read, write | `0660` | `2770` |
+| `adminlist.txt`, `bannedlist.txt`, `permittedlist.txt` | the lists | read, write | `0660` | |
+| everything else | what the server keeps for itself | read | `0640` | `2750` |
+
+The directories on the way there, `~/.config` and below, are opened to the
+group for passing through only (`g+x`), not for listing or writing. They
+are kept that way by the same four means as for Project Zomboid.
 
 ## Multiple servers and multiple worlds
 
@@ -315,6 +408,10 @@ below `/usr/share/doc/gamemaster/` and meant to be copied to the agent:
   | `zomboid-restore` | put a backup of a world back without deleting the current state |
   | `zomboid-troubleshoot` | where the logs are, what to look for, common causes |
   | `zomboid-knowledge` | power and water, network addresses, what "running" means |
+  | `valheim-world` | create a world or load another one |
+  | `valheim-players` | who is online, bans, admins, permitted players |
+  | `valheim-troubleshoot` | where the logs are, what to look for, common causes |
+  | `valheim-knowledge` | saving, worlds, network, what "running" means |
 
 The profile is read with every message; a skill only when a task needs it.
 That keeps the profile short. The skills follow the common `SKILL.md`
@@ -325,6 +422,7 @@ into the profile of the agent:
 ```
 ~/.hermes/profiles/<profile>/SOUL.md
 ~/.hermes/profiles/<profile>/skills/gameserver/zomboid-*/SKILL.md
+~/.hermes/profiles/<profile>/skills/gameserver/valheim-*/SKILL.md
 ```
 
 Every skill then is also a command of its own in the chat, e.g.
@@ -332,8 +430,8 @@ Every skill then is also a command of its own in the chat, e.g.
 look at them now and then to see that the rules of the profile still
 hold.
 
-What the sudoers file enforces is the machine: the agent may run one
-program, and nothing else. No packages, no users, no services, no files
+What the sudoers file enforces is the machine: the agent may run the
+programs of the games, `zomboid` and `valheim`, and nothing else. No packages, no users, no services, no files
 outside the servers it looks after. That boundary is real and does not depend
 on the agent behaving. The agent user is a member of the group of every
 registered server user, so it can read that server's files and logs.
@@ -425,6 +523,9 @@ etc/
   gamemaster/
     gamemaster.conf             general settings, default user, agent user
     zomboid/<user>.conf         one file per registered server
+    valheim/<user>.conf         the same for Valheim
+    valheim/<user>.env          name and password of a Valheim server,
+                                for its service, written by GameMaster
     hooks/                      scripts of the administrator that the
                                 services run as root
   sudoers.d/gamemaster          what the agent user is allowed to run
@@ -435,10 +536,15 @@ usr/
                                 agent user
     zomboid                     run a server: status, start, stop, save,
                                 message, update, worlds, players, options
+    valheim                     run a Valheim server: status, start, stop,
+                                update, worlds, players and their lists
   share/gamemaster/zomboid/
     template.conf               template for a server configuration
     template.ini                template for a world
     template_SandboxVars.lua    template for the sandbox settings
+    template.service            template for the systemd service
+  share/gamemaster/valheim/
+    template.conf               template for a server configuration
     template.service            template for the systemd service
   share/doc/gamemaster/
     SOUL.md                     the profile of the agent, what it may
@@ -459,6 +565,7 @@ usr/
     sshkey.py                   public keys and authorized_keys
     rcon.py                     the Source RCON protocol
     zomboid.py                  worlds and commands of a Zomboid server
+    valheim.py                  worlds, log and lists of a Valheim server
 tests/                          unit tests, not part of the package
 ```
 
@@ -470,7 +577,7 @@ PYTHONPATH=usr/lib/python3/dist-packages python3 -m unittest discover tests
 
 ## Roadmap
 
-- manual pages for `gamemaster` and `zomboid`
+- manual pages for `gamemaster`, `zomboid` and `valheim`
 - more games
 
 ## Development note

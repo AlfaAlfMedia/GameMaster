@@ -11,7 +11,7 @@ import subprocess
 from pathlib import Path
 from typing import NamedTuple
 
-from gamemaster import validate
+from gamemaster import permissions, validate
 from gamemaster.errors import GameMasterError
 
 UNIT_DIR = Path("/etc/systemd/system")
@@ -82,6 +82,45 @@ def parse_command(text: str) -> Command:
     return Command(
         prefix, Path(validate.parse_absolute_path(match["program"])), arguments
     )
+
+
+# Commands the administrator adds to the service in the configuration of a
+# server, numbered from 1: <PREFIX>_EXEC_START_PRE_1, ..._2 and so on.
+# setting without the prefix of the game -> line in the unit
+HOOK_SETTINGS = {
+    "EXEC_START_PRE": "ExecStartPre",
+    "EXEC_START_POST": "ExecStartPost",
+    "EXEC_STOP_POST": "ExecStopPost",
+}
+
+
+def hook_lines(values: dict[str, str], prefix: str, source: str) -> list[str]:
+    """Return the lines the administrator added to a service, checked.
+
+    prefix is the one of the game, as PZ for PZ_EXEC_START_PRE_1. A command
+    that runs as root must be out of reach of everyone but root, otherwise
+    the server user - or anyone who takes it over - could put its own
+    program in its place and have it run as root at the next start.
+    """
+    lines: list[str] = []
+
+    for setting, directive in HOOK_SETTINGS.items():
+        numbered: list[tuple[int, str, str]] = []
+        for key, value in values.items():
+            match = re.fullmatch(rf"{prefix}_{setting}_([0-9]+)", key)
+            if match and value.strip():
+                numbered.append((int(match[1]), key, value))
+
+        for _number, key, value in sorted(numbered):
+            try:
+                command = parse_command(value)
+                if command.as_root:
+                    permissions.require_root_only(command.program)
+            except GameMasterError as error:
+                raise GameMasterError(f"{key} in {source}: {error}") from error
+            lines.append(f"{directive}={command.line}")
+
+    return lines
 
 
 def unit_file(name: str) -> Path:

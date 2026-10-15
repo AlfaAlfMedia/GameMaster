@@ -16,9 +16,11 @@ esac
 
 case "$1" in
     purge)
-        # The service files were written by 'zomboid world init' and do not
-        # belong to the package, so debhelper does not know about them.
-        for unit in /etc/systemd/system/zomboid-*.service; do
+        # The service files were written by 'zomboid world init' and
+        # 'valheim world create' and do not belong to the package, so
+        # debhelper does not know about them.
+        for unit in /etc/systemd/system/zomboid-*.service \
+                    /etc/systemd/system/valheim-*.service; do
             [ -e "$unit" ] || continue
             name=$(basename "$unit")
             systemctl stop "$name" >/dev/null 2>&1 || true
@@ -27,9 +29,11 @@ case "$1" in
         done
         systemctl daemon-reload >/dev/null 2>&1 || true
 
-        # Holds the passwords of the registered servers. The servers do not
-        # need them: the RCON password also stands in the ini file of the
-        # world, the admin password in its database.
+        # Holds the passwords of the registered servers. The Zomboid servers
+        # do not need them: the RCON password also stands in the ini file of
+        # the world, the admin password in its database. A Valheim server
+        # takes its password on the command line, which its own start
+        # script has to give it from then on.
         rm -rf /etc/gamemaster
         rm -rf /var/log/gamemaster
 

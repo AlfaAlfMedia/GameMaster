@@ -1,3 +1,21 @@
+gamemaster (0.2.0) UNRELEASED; urgency=medium
+
+  * Valheim: 'gamemaster install valheim' and 'gamemaster add valheim', and
+    the new program 'valheim' to run a server: status, start, stop, update,
+    worlds, the players that are online, and the lists of admins, banned
+    and permitted players. Valheim has no remote console, so the state of
+    a server and its players are read from its log.
+  * The agent may run /usr/sbin/valheim through sudo as well.
+  * The ports of a new server are checked against the servers of every
+    game, and Valheim's second port counts as taken too.
+  * gamemaster.conf has new settings VH_APP_ID, VH_DEFAULT_BRANCH and
+    VH_DEFAULT_USER. A gamemaster.conf that was changed by hand is kept by
+    dpkg; add the three lines there before installing a Valheim server.
+  * SOUL.md covers both games; new skills valheim-world, valheim-players,
+    valheim-troubleshoot and valheim-knowledge.
+
+ -- AlfaAlf <git@alfaalf-media.de>  Thu, 15 Oct 2026 14:00:00 +0200
+
 gamemaster (0.1.7) unstable; urgency=medium
 
   * 'gamemaster add zomboid' without -d looks for the server in the home

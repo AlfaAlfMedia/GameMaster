@@ -2,5 +2,7 @@ etc/gamemaster/gamemaster.conf   etc/gamemaster/
 etc/sudoers.d/gamemaster         etc/sudoers.d/
 usr/sbin/gamemaster              usr/sbin/
 usr/sbin/zomboid                 usr/sbin/
+usr/sbin/valheim                 usr/sbin/
 usr/lib/python3/dist-packages/gamemaster/*.py  usr/lib/python3/dist-packages/gamemaster/
 usr/share/gamemaster/zomboid/    usr/share/gamemaster/
+usr/share/gamemaster/valheim/    usr/share/gamemaster/

@@ -17,17 +17,16 @@ Recommends: steamcmd
 Description: administration tools for game servers on Linux
  GameMaster runs game servers on Linux. A server is set up by an
  administrator with the gamemaster program, and run afterwards with one
- program per game - currently zomboid, for Project Zomboid.
+ program per game: zomboid for Project Zomboid, valheim for Valheim.
  .
  Every server belongs to its own Linux user, which owns the installation,
  the worlds and the save games. A server runs as a systemd service of its
- own, and its world is created in three steps, the middle one being the
- settings and the mods.
+ own, which loads one of its worlds at a time.
  .
- A separate user may run exactly one program through sudo, and nothing
- else on the machine. That is the door an AI agent comes through: it can
- run the servers and read their logs without being able to touch anything
- around them.
+ A separate user may run exactly the programs of the games through sudo,
+ and nothing else on the machine. That is the door an AI agent comes
+ through: it can run the servers and read their logs without being able to
+ touch anything around them.
  .
  SteamCMD is only needed to install a server; it comes from the non-free
  section and is therefore recommended, not required.

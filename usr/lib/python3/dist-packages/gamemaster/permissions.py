@@ -199,6 +199,42 @@ def read_text(path: Path, encoding: str = "utf-8") -> str:
             raise PermissionsError(f"Could not read {path}: {error}") from error
 
 
+def write_text(path: Path, content: str, owner: Owner, mode: int) -> None:
+    """Write a file, which must not be a link, and hand it to owner.
+
+    A file that is there already is changed in place, so it keeps being the
+    same file; a missing one is created. The directory above it is entered
+    without following a link either.
+    """
+    with opened(open_directory(path.parent)) as parent_fd:
+        try:
+            fd = os.open(
+                path.name,
+                os.O_WRONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
+                dir_fd=parent_fd,
+            )
+        except FileNotFoundError:
+            create_file(parent_fd, path.name, content, owner, mode)
+            return
+        except OSError as error:
+            raise PermissionsError(_unusable(path, error)) from error
+
+        with opened(fd):
+            status = os.fstat(fd)
+            if not stat.S_ISREG(status.st_mode):
+                raise PermissionsError(f"{path} is not a regular file.")
+            if status.st_nlink != 1:
+                raise PermissionsError(f"{path} has more than one name (hard link).")
+            os.set_blocking(fd, True)
+            hand_over(fd, owner, mode)
+            try:
+                os.ftruncate(fd, 0)
+                with os.fdopen(os.dup(fd), "w", encoding="utf-8") as target:
+                    target.write(content)
+            except OSError as error:
+                raise PermissionsError(f"Could not write {path}: {error}") from error
+
+
 def _unusable(path: Path, error: OSError) -> str:
     """Say why a path could not be opened, naming a link as such."""
     if error.errno == errno.ELOOP:
@@ -251,6 +287,40 @@ def open_to_group(path: Path) -> bool:
                 f"Could not open {path} to its group: {error.strerror}"
             ) from error
         return True
+
+
+def open_path_to_group(base: Path, names: tuple[str, ...]) -> None:
+    """Let the group pass through the directories below base, one by one.
+
+    For a data directory deep below the home, as ~/.config/unity3d/...: the
+    group may enter every directory on the way, but neither list nor change
+    it. Directories that do not exist yet are left out, as is everything
+    after them. Owner and the other permissions stay as they are.
+    """
+    fd = open_directory(base)
+    try:
+        for name in names:
+            try:
+                next_fd = os.open(name, DIRECTORY_FLAGS, dir_fd=fd)
+            except FileNotFoundError:
+                return
+            except OSError as error:
+                raise PermissionsError(_unusable(base / name, error)) from error
+            os.close(fd)
+            fd = next_fd
+            base = base / name
+
+            mode = stat.S_IMODE(os.fstat(fd).st_mode)
+            wanted = (mode | 0o010) & ~0o020
+            if wanted != mode:
+                try:
+                    os.fchmod(fd, wanted)
+                except OSError as error:
+                    raise PermissionsError(
+                        f"Could not open {base} to its group: {error.strerror}"
+                    ) from error
+    finally:
+        os.close(fd)
 
 
 def file_mode(modes: Modes, current: int) -> int:

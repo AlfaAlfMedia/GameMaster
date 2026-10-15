@@ -1,0 +1,62 @@
+# The systemd service of the Valheim server of user @CONF_USER@.
+# Written by GameMaster ('valheim world create', 'valheim world switch',
+# 'valheim service'), which replace it every time - do not edit it by hand.
+# Settings and commands of your own go into
+# /etc/gamemaster/valheim/@CONF_USER@.conf.
+
+[Unit]
+Description=Valheim Dedicated Server (@USER@, world @WORLD@)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@USER@
+WorkingDirectory=@INSTALL_DIR@
+
+# Whatever the server creates may be read by its group, and changed where
+# the group is allowed to; fix-permissions sorts it again before the next
+# start
+UMask=0007
+
+# The name and the password of the server. They come from a file only root
+# may read, and not from this unit, which everyone may read.
+EnvironmentFile=@ENV_FILE@
+
+# What the start script of the game sets before it starts the server; the
+# ID is the one of the game, not of the dedicated server
+Environment=LD_LIBRARY_PATH=@INSTALL_DIR@/linux64
+Environment=SteamAppId=892970
+
+# Before the server starts: give its files back to it, then fetch a new
+# version of the server.
+#   +  run this as root, not as the server user: fix-permissions changes the
+#      owner of files, and update reads the settings of the server, which
+#      only root may read
+#   -  neither may keep the server from starting when it fails
+ExecStartPre=-+/usr/sbin/valheim -u @CONF_USER@ fix-permissions
+ExecStartPre=-+/usr/sbin/valheim -u @CONF_USER@ update
+
+# Commands the administrator added in the configuration of this server
+# (VH_EXEC_START_PRE_1 and so on). 'valheim service' writes them in again.
+@HOOKS@
+
+ExecStart=@INSTALL_DIR@/valheim_server.x86_64 -nographics -batchmode -name ${VH_NAME} -port @PORT@ -world @WORLD@ -password ${VH_PASSWORD} -public @PUBLIC@@OPTIONS@
+
+# The server is stopped by systemd only; it must not start again by itself
+Restart=no
+
+# SIGINT is the signal of Ctrl+C in a terminal, on which the server saves
+# the world and shuts down. After three minutes it is killed.
+KillSignal=SIGINT
+TimeoutStopSec=180
+
+# SteamCMD may take a long time, and that time counts towards the start
+TimeoutStartSec=1800
+
+StandardOutput=append:@LOG_FILE@
+StandardError=append:@LOG_FILE@
+
+[Install]
+WantedBy=multi-user.target

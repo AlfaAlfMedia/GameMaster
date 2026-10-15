@@ -1,0 +1,547 @@
+#!/usr/bin/python3
+"""Run a Valheim server. Must be run as root.
+
+Usage:
+    valheim [-u|--username USERNAME] COMMAND ...
+
+Setting a machine up is the job of 'gamemaster' and stays there: it
+creates the Linux user, installs the server and registers it. From then
+on this program takes over.
+
+A server runs as the systemd service valheim-<username>. There is one
+service per user, because the worlds of a user share one data directory
+and the server loads one of them at a time.
+
+    valheim status                    is a server running, with which world
+    valheim start                     start the service
+    valheim stop                      save the world and shut the server down
+    valheim update                    update the server with SteamCMD
+    valheim fix-permissions           give the files back to the server user
+    valheim service                   write the service again from the settings
+
+    valheim world list                worlds of this server
+    valheim world create NAME         let the server create a new world and
+                                      load it
+    valheim world switch NAME         let the service load another world
+
+    valheim player list               players that are connected
+    valheim player lists              admins, banned and permitted players
+    valheim player ban ID | unban ID
+    valheim player admin ID | unadmin ID
+    valheim player permit ID | unpermit ID
+
+Valheim has no remote console. What the server is doing is read from its
+log, and players are banned or made admins through its three list files,
+which the server reads again when they change. A player ID is the
+platform and the ID on it, as Steam_76561198000000000.
+
+Without -u the user VH_DEFAULT_USER from /etc/gamemaster/gamemaster.conf
+is taken. Every command reports short lines on standard output and returns
+0 or 1.
+"""
+
+import argparse
+import os
+import signal
+import sys
+import time
+
+from gamemaster import context, service, validate, valheim
+from gamemaster.errors import GameMasterError
+
+# How long the server may take to come up, how often it is looked at, and
+# how often a line is printed while waiting. A new world is generated on
+# its first start, which takes a while on a slow machine.
+STARTUP_TIMEOUT = 600.0
+CHECK_INTERVAL = 2.0
+WAITING_MESSAGE_INTERVAL = 15.0
+
+# How long the server may take to save and disappear
+SHUTDOWN_TIMEOUT = 180.0
+
+
+# ---------------------------------------------------------------------------
+# Waiting
+# ---------------------------------------------------------------------------
+
+
+def log_size(server: valheim.Server, worldname: str) -> int:
+    """Return how long the log of a world is now, so only what follows counts."""
+    try:
+        return valheim.log_file(server, worldname).stat().st_size
+    except FileNotFoundError:
+        return 0
+    except OSError as error:
+        raise GameMasterError(f"Could not read the log file: {error}") from error
+
+
+def new_log_lines(server: valheim.Server, worldname: str, offset: int) -> list[str]:
+    """Return the lines written to the log of a world after offset."""
+    path = valheim.log_file(server, worldname)
+    try:
+        with open(path, "rb") as source:
+            source.seek(offset)
+            data = source.read()
+    except FileNotFoundError:
+        return []
+    except OSError as error:
+        raise GameMasterError(f"Could not read {path}: {error}") from error
+    return data.decode("utf-8", "replace").splitlines()
+
+
+def wait_until_ready(server: valheim.Server, worldname: str, offset: int) -> None:
+    """Wait until the server says it can be joined, or raise after the timeout."""
+    context.report("waiting for the server")
+
+    start = time.monotonic()
+    deadline = start + STARTUP_TIMEOUT
+    next_message = start + WAITING_MESSAGE_INTERVAL
+
+    while time.monotonic() < deadline:
+        if valheim.is_ready(new_log_lines(server, worldname, offset)):
+            return
+
+        if (valheim.find_running_server(server.server_user) is None
+                and time.monotonic() > start + CHECK_INTERVAL):
+            raise GameMasterError(
+                "The server stopped by itself. See the log file: "
+                f"{valheim.log_file(server, worldname)}"
+            )
+
+        now = time.monotonic()
+        if now >= next_message:
+            context.report(f"still waiting ({now - start:.0f}s)")
+            next_message = now + WAITING_MESSAGE_INTERVAL
+
+        time.sleep(CHECK_INTERVAL)
+
+    raise GameMasterError(
+        f"The server did not report itself ready after {STARTUP_TIMEOUT:.0f} "
+        f"seconds. See the log file: {valheim.log_file(server, worldname)}"
+    )
+
+
+def wait_until_gone(server: valheim.Server) -> None:
+    """Wait until no server process of this user is left."""
+    deadline = time.monotonic() + SHUTDOWN_TIMEOUT
+
+    while time.monotonic() < deadline:
+        if valheim.find_running_server(server.server_user) is None:
+            return
+        time.sleep(CHECK_INTERVAL)
+
+    raise GameMasterError(
+        f"The server is still running {SHUTDOWN_TIMEOUT:.0f} seconds after it "
+        "was asked to stop. It has been left alone."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Starting and stopping
+# ---------------------------------------------------------------------------
+
+
+def require_unit(server: valheim.Server) -> str:
+    """Return the name of the service, or raise if it does not exist yet."""
+    name = valheim.unit_name(server.username)
+    if not service.exists(name):
+        raise GameMasterError(
+            f"There is no service for user '{server.username}' yet. "
+            f"Create a world first: valheim world create WORLDNAME."
+        )
+    return name
+
+
+def bring_up(server: valheim.Server) -> str:
+    """Start the service and wait until the world can be joined."""
+    name = require_unit(server)
+    worldname = valheim.unit_world(server)
+
+    if worldname is None:
+        raise GameMasterError(
+            f"The service {name}.service does not say which world to load."
+        )
+
+    offset = log_size(server, worldname)
+    context.report(f"starting world '{worldname}'")
+    service.start(name)
+    wait_until_ready(server, worldname, offset)
+    context.report(f"world '{worldname}' is up")
+
+    return worldname
+
+
+def bring_down(server: valheim.Server) -> str:
+    """Let the server save its world and shut down, and wait until it is gone.
+
+    The server saves when it gets SIGINT, the signal of Ctrl+C. systemd
+    sends it when the service is stopped; a server that was started by
+    hand gets it directly.
+    """
+    running = valheim.find_running_server(server.server_user)
+    if running is None:
+        raise GameMasterError(
+            f"No Valheim server is running for user '{server.server_user}'."
+        )
+
+    context.report(f"stopping world '{running.worldname}'")
+
+    name = valheim.unit_name(server.username)
+    if service.exists(name) and service.is_active(name):
+        service.stop(name)
+    else:
+        try:
+            os.kill(running.pid, signal.SIGINT)
+        except ProcessLookupError:
+            pass
+        except OSError as error:
+            raise GameMasterError(
+                f"Could not stop process {running.pid}: {error}"
+            ) from error
+
+    wait_until_gone(server)
+    context.report(f"world '{running.worldname}' saved and stopped")
+    return running.worldname
+
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+
+
+def show_status(server: valheim.Server, _arguments: argparse.Namespace) -> None:
+    """Say whether a server is running, which world it has loaded and who plays."""
+    state, running, lines = valheim.server_state(server)
+    name = valheim.unit_name(server.username)
+
+    context.report(f"user: {server.server_user}")
+    context.report(f"state: {state}")
+    context.report(f"service: {name}.service" if service.exists(name) else "service: none")
+
+    if service.exists(name):
+        context.report(f"service world: {valheim.unit_world(server)}")
+
+    if running is None:
+        return
+
+    context.report(f"world: {running.worldname}")
+    context.report(f"process: {running.pid}")
+
+    if state == valheim.RUNNING:
+        report_players(valheim.players_from_log(lines))
+
+
+def start_command(server: valheim.Server, _arguments: argparse.Namespace) -> None:
+    """Start the service of this server."""
+    valheim.require_stopped(server, "start it")
+    bring_up(server)
+
+
+def stop_command(server: valheim.Server, _arguments: argparse.Namespace) -> None:
+    """Save the world and shut the server down."""
+    bring_down(server)
+
+
+def update_command(server: valheim.Server, _arguments: argparse.Namespace) -> None:
+    """Update the installed server with SteamCMD."""
+    valheim.require_stopped(server, "update the server")
+
+    settings = context.gamemaster_settings()
+    app_id = settings.get(valheim.APP_ID_KEY)
+    if not app_id:
+        raise GameMasterError(
+            f"{valheim.APP_ID_KEY} is not set in {context.GAMEMASTER_CONF_FILE}."
+        )
+
+    context.report(
+        f"updating {server.install_dir} (branch '{server.branch}') with SteamCMD"
+    )
+    valheim.update_server(server, app_id)
+    context.report("server updated")
+
+
+def fix_permissions_command(server: valheim.Server, _arguments: argparse.Namespace) -> None:
+    """Give every file of the server back to the server user and its group.
+
+    Run by the service before every start, and whenever files were copied,
+    moved or put back from a backup by someone else.
+    """
+    result = valheim.fix_permissions(server)
+
+    if result is None:
+        context.report(f"{server.data_dir} does not exist yet, nothing to fix")
+        return
+
+    context.report(f"permissions of {server.data_dir}: {result.changed} changed")
+    for skipped in result.skipped:
+        context.report(f"left alone: {skipped.path} ({skipped.reason})")
+
+
+def service_command(server: valheim.Server, _arguments: argparse.Namespace) -> None:
+    """Write the service again, with the settings as they are now.
+
+    Needed after the configuration of the server was changed: its name, its
+    password, its port and the commands of the administrator. The running
+    server is left alone; the new service applies from its next start.
+    """
+    name = require_unit(server)
+    worldname = valheim.unit_world(server)
+    if worldname is None:
+        raise GameMasterError(
+            f"The service {name}.service does not say which world to load."
+        )
+
+    path = valheim.install_unit(server, worldname)
+    context.report(f"service written: {path} (world '{worldname}')")
+
+    if service.is_active(name):
+        context.report("the server is running; the new service applies from its next start")
+
+
+# -- worlds -----------------------------------------------------------------
+
+
+def list_worlds_command(server: valheim.Server, _arguments: argparse.Namespace) -> None:
+    """List the worlds of this server and say which one is running."""
+    worlds = valheim.find_worlds(server.data_dir)
+    running = valheim.find_running_server(server.server_user)
+    loaded = running.worldname if running else None
+
+    if not worlds:
+        context.report("no worlds")
+        return
+
+    context.report("worlds:")
+    for name in worlds:
+        context.report(f"  {name}{' (running)' if name == loaded else ''}")
+
+
+def load_world(server: valheim.Server, worldname: str) -> None:
+    """Point the service at a world and start it, stopping the running one."""
+    # Before the server is stopped: a mistake in the settings of the
+    # service must not leave it down
+    valheim.read_service_settings(server)
+    valheim.unit_hooks(server)
+
+    if valheim.find_running_server(server.server_user) is not None:
+        bring_down(server)
+
+    path = valheim.install_unit(server, worldname)
+    service.enable(valheim.unit_name(server.username))
+    context.report(f"service now loads '{worldname}': {path}")
+
+    bring_up(server)
+
+
+def create_world_command(server: valheim.Server, arguments: argparse.Namespace) -> None:
+    """Let the server create a new world on its next start, and start it."""
+    worldname = validate.parse_worldname(arguments.name)
+
+    if worldname in valheim.find_worlds(server.data_dir):
+        raise GameMasterError(
+            f"The world '{worldname}' already exists. Load it with: "
+            f"valheim -u {server.username} world switch {worldname}"
+        )
+
+    context.report(f"the server creates world '{worldname}' as it starts")
+    load_world(server, worldname)
+
+    # On its very first start the server has just created its data
+    # directory, readable for its group; from now on it is sorted like the
+    # rest
+    fix_permissions_command(server, arguments)
+
+    if worldname not in valheim.find_worlds(server.data_dir):
+        context.report(
+            f"note: the server is up, but the files of '{worldname}' are not "
+            "there yet; they are written when the server saves"
+        )
+
+
+def switch_world_command(server: valheim.Server, arguments: argparse.Namespace) -> None:
+    """Let the service load another world."""
+    worldname = validate.parse_worldname(arguments.name)
+
+    if worldname not in valheim.find_worlds(server.data_dir):
+        raise GameMasterError(
+            f"There is no world '{worldname}'. Run 'valheim world list', or "
+            f"create it with 'valheim world create {worldname}'."
+        )
+
+    require_unit(server)
+    load_world(server, worldname)
+
+
+# -- players ----------------------------------------------------------------
+
+
+def report_players(players: list[valheim.Player]) -> None:
+    """Print the players that are connected, one per line."""
+    if not players:
+        context.report("players: none")
+        return
+
+    context.report(f"players: {len(players)}")
+    for player in players:
+        context.report(f"  {player.name}{f' ({player.peer})' if player.peer else ''}")
+
+
+def list_players(server: valheim.Server, _arguments: argparse.Namespace) -> None:
+    """List the players that are connected, as the log tells."""
+    state, running, lines = valheim.server_state(server)
+
+    if running is None:
+        raise GameMasterError(
+            f"No Valheim server is running for user '{server.server_user}'."
+        )
+    if state != valheim.RUNNING:
+        raise GameMasterError(
+            f"The server of user '{server.server_user}' is still starting "
+            f"(world '{running.worldname}')."
+        )
+
+    report_players(valheim.players_from_log(lines))
+
+
+def show_lists(server: valheim.Server, _arguments: argparse.Namespace) -> None:
+    """Show the admins, the banned and the permitted players."""
+    for name in valheim.LISTS:
+        entries = valheim.read_list(server, name)
+        context.report(f"{name}: {len(entries)}")
+        for entry in entries:
+            context.report(f"  {entry}")
+
+    if valheim.read_list(server, "permitted"):
+        context.report("note: only the permitted players may join")
+
+
+def change_list(name: str, add: bool):
+    """Return the command that puts a player on a list or takes them off."""
+    def command(server: valheim.Server, arguments: argparse.Namespace) -> None:
+        player_id = arguments.player_id
+        if add:
+            changed = valheim.add_to_list(server, name, player_id)
+            context.report(
+                f"{player_id} added to the {name} list" if changed
+                else f"{player_id} is already on the {name} list"
+            )
+            if changed and name == "permitted":
+                context.report("note: only the permitted players may join now")
+        else:
+            changed = valheim.remove_from_list(server, name, player_id)
+            context.report(
+                f"{player_id} removed from the {name} list" if changed
+                else f"{player_id} is not on the {name} list"
+            )
+
+    return command
+
+
+# ---------------------------------------------------------------------------
+# Command line
+# ---------------------------------------------------------------------------
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Describe the command line."""
+    parser = argparse.ArgumentParser(
+        prog="valheim",
+        description="Run a Valheim server.",
+    )
+    parser.add_argument(
+        "-u",
+        "--username",
+        metavar="USERNAME",
+        default=None,
+        help="user whose server is meant "
+             f"(default: {valheim.DEFAULT_USER_KEY} from "
+             f"{context.GAMEMASTER_CONF_FILE})",
+    )
+
+    commands = parser.add_subparsers(dest="command", metavar="COMMAND")
+    commands.required = True
+
+    commands.add_parser("status", help="is a server running").set_defaults(
+        action=show_status)
+    commands.add_parser("start", help="start the service").set_defaults(
+        action=start_command)
+    commands.add_parser("stop", help="save the world and shut down").set_defaults(
+        action=stop_command)
+    commands.add_parser("update", help="update the server with SteamCMD").set_defaults(
+        action=update_command)
+    commands.add_parser(
+        "fix-permissions", help="give the files back to the server user"
+    ).set_defaults(action=fix_permissions_command)
+    commands.add_parser(
+        "service", help="write the service again from the settings"
+    ).set_defaults(action=service_command)
+
+    add_world_commands(commands)
+    add_player_commands(commands)
+
+    return parser
+
+
+def add_world_commands(commands) -> None:
+    """Describe 'valheim world ...'."""
+    world = commands.add_parser("world", help="the worlds of this server")
+    actions = world.add_subparsers(dest="world_command", metavar="ACTION")
+    actions.required = True
+
+    actions.add_parser("list", help="the worlds of this server").set_defaults(
+        action=list_worlds_command)
+
+    create = actions.add_parser("create", help="create a new world and load it")
+    create.add_argument("name", metavar="NAME", help="name of the new world")
+    create.set_defaults(action=create_world_command)
+
+    switch = actions.add_parser("switch", help="let the service load another world")
+    switch.add_argument("name", metavar="NAME", help="name of the world")
+    switch.set_defaults(action=switch_world_command)
+
+
+# command -> (list, add or remove, help)
+LIST_COMMANDS = {
+    "ban": ("banned", True, "ban a player"),
+    "unban": ("banned", False, "lift the ban on a player"),
+    "admin": ("admin", True, "make a player an admin"),
+    "unadmin": ("admin", False, "take admin rights away from a player"),
+    "permit": ("permitted", True, "let a player join when only the permitted may"),
+    "unpermit": ("permitted", False, "take a player off the permitted list"),
+}
+
+
+def add_player_commands(commands) -> None:
+    """Describe 'valheim player ...'."""
+    player = commands.add_parser("player", help="the players on this server")
+    actions = player.add_subparsers(dest="player_command", metavar="ACTION")
+    actions.required = True
+
+    actions.add_parser("list", help="players that are connected").set_defaults(
+        action=list_players)
+    actions.add_parser(
+        "lists", help="admins, banned and permitted players"
+    ).set_defaults(action=show_lists)
+
+    for command, (name, add, text) in LIST_COMMANDS.items():
+        parser = actions.add_parser(command, help=text)
+        parser.add_argument(
+            "player_id", metavar="ID", help="platform and ID, as Steam_76561198000000000"
+        )
+        parser.set_defaults(action=change_list(name, add))
+
+
+def main() -> int:
+    """Start of the program. Returns the exit code (0 = everything ok)."""
+    arguments = build_parser().parse_args()
+
+    def carry_out() -> None:
+        context.require_root()
+        server = valheim.load(arguments.username)
+        arguments.action(server, arguments)
+
+    return context.run(carry_out)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
