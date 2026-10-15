@@ -1,4 +1,4 @@
-gamemaster (0.3.0) UNRELEASED; urgency=medium
+gamemaster (0.3.0) unstable; urgency=medium
 
   * A Valheim world is set up in the same steps as a Zomboid world:
     'valheim world create NAME' writes the rules of the world, to be
