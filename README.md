@@ -5,9 +5,8 @@ by an AI agent through a narrow, explicitly granted set of commands.
 
 Supported games: **Project Zomboid** and **Valheim**.
 
-> **Status: in development.** Project Zomboid runs under GameMaster on a
-> live server; Valheim is new in 0.2.0 and has only been tried on a test
-> machine.
+> **Status: in development.** Project Zomboid and Valheim both run under
+> GameMaster on a live server.
 
 - [Features](#features)
 - [Requirements](#requirements)
