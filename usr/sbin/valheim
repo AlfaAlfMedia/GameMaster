@@ -32,8 +32,9 @@ and the server loads one of them at a time.
 
 Valheim has no remote console. What the server is doing is read from its
 log, and players are banned or made admins through its three list files,
-which the server reads again when they change. A player ID is the
-platform and the ID on it, as Steam_76561198000000000.
+which the server reads again when they change. A player ID is written
+as the server writes it into its log, which 'valheim player list' shows:
+the bare Steam ID, or the platform and the ID, as Steam_76561198000000000.
 
 Without -u the user VH_DEFAULT_USER from /etc/gamemaster/gamemaster.conf
 is taken. Every command reports short lines on standard output and returns
@@ -526,7 +527,8 @@ def add_player_commands(commands) -> None:
     for command, (name, add, text) in LIST_COMMANDS.items():
         parser = actions.add_parser(command, help=text)
         parser.add_argument(
-            "player_id", metavar="ID", help="platform and ID, as Steam_76561198000000000"
+            "player_id", metavar="ID", help="as 'player list' shows it, e.g. 76561198000000000 "
+                 "or Steam_76561198000000000"
         )
         parser.set_defaults(action=change_list(name, add))
 

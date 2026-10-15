@@ -120,6 +120,21 @@ class LogTest(Base):
         # Sigrid left; Ragnar died and came back, and counts once
         self.assertEqual(players, [valheim.Player("Ragnar", "76561198000000001")])
 
+    def test_lines_of_a_real_steam_server(self) -> None:
+        # The order a server on the Steam backend writes them in, taken from
+        # a live log; ID and name are made up
+        lines = [
+            "11/22/2025 21:03:28: Got connection SteamID 76561197900000001",
+            "11/22/2025 21:03:28: Got handshake from client 76561197900000001",
+            "11/22/2025 21:03:57: Got character ZDOID from Halvar : -423468202:1",
+        ]
+        self.assertEqual(
+            valheim.players_from_log(lines),
+            [valheim.Player("Halvar", "76561197900000001")],
+        )
+        lines.append("11/22/2025 21:42:44: Closing socket 76561197900000001")
+        self.assertEqual(valheim.players_from_log(lines), [])
+
     def test_crossplay_players_are_known_by_their_platform_id(self) -> None:
         lines = [
             "PlayFab socket with remote ID playfab/ABC received local Platform ID Steam_76561198000000003",

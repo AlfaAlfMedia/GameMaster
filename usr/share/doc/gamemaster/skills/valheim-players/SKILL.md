@@ -28,14 +28,19 @@ There is no command to kick a player or to send a message. An admin in the
 game can kick with the console there.
 
 ## Player IDs
-The lists hold IDs, not names: the platform and the ID on it, as
-`Steam_76561198000000000`. To find one:
+The lists hold IDs, not names. To find one:
 
     sudo valheim [-u <user>] player list
 
-shows the players that are online with their ID in brackets. For a player
-who is offline, ask the user for the ID; a player sees it in the game with
-F2. Never guess an ID from a name.
+shows the players that are online with their ID in brackets, the way the
+server writes it into its log: the bare Steam ID, as `76561198000000000`,
+or with the platform before it, as `Steam_76561198000000000`. Use it
+exactly as shown. For a player who is offline, ask the user for the ID; a
+player sees it in the game with F2. Never guess an ID from a name.
+
+If a ban or admin rights with the bare number do not take effect, the
+server may want the form with the platform: take the entry off again and
+add `Steam_<number>` instead. Tell the user which form worked.
 
 ## Steps
 Every command runs on the game server machine, as described in your

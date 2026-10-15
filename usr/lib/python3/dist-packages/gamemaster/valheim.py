@@ -393,9 +393,10 @@ LIST_HEADERS = {
 
 COMMENT = "//"
 
-# The ID of a player as the server writes it into its log and its lists:
-# the platform and the user ID on it, as Steam_76561198000000000. Lists
-# written by older versions hold the bare Steam ID.
+# The ID of a player as the server writes it into its log and its lists.
+# Its manual gives the platform and the user ID on it, as
+# Steam_76561198000000000; the log of a server on the Steam backend shows
+# the bare Steam ID. Both are taken.
 PLAYER_ID_PATTERN = re.compile(r"(?:[A-Za-z]+_)?[A-Za-z0-9]{1,64}")
 
 
@@ -403,8 +404,8 @@ def parse_player_id(text: str) -> str:
     """Return the ID of a player for one of the lists."""
     if not PLAYER_ID_PATTERN.fullmatch(text):
         raise GameMasterError(
-            f"{text!r} is not a player ID: use the platform and the ID on it, "
-            f"as Steam_76561198000000000."
+            f"{text!r} is not a player ID: use it as 'valheim player list' "
+            f"shows it, as 76561198000000000 or Steam_76561198000000000."
         )
     return text
 

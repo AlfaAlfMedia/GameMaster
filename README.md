@@ -241,8 +241,11 @@ Run as root, by a human or by the agent. Every command takes
 | `valheim player admin ID` / `unadmin ID` | the list of admins |
 | `valheim player permit ID` / `unpermit ID` | the list of permitted players; once anybody is on it, only they may join |
 
-A player ID is the platform and the ID on it, as `Steam_76561198000000000`,
-the way the server writes it into its log and its lists.
+A player ID is given the way the server writes it into its log, which
+`valheim player list` shows: the bare Steam ID, as `76561198000000000`, or
+the platform and the ID, as `Steam_76561198000000000`, which is the form
+the manual of the server names. Which of the two a server takes in its
+lists has not been checked with every version.
 
 ### Configuration
 

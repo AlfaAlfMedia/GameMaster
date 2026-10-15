@@ -86,8 +86,8 @@ Valheim has no remote console: there is no `save`, no `message` and no
 | `player admin <id>`, `player unadmin <id>` | give and take admin rights |
 | `player permit <id>`, `player unpermit <id>` | the permitted list; once anybody is on it, only those on it may join |
 
-A player ID is the platform and the ID on it, as `Steam_76561198000000000`.
-`player list` shows it next to the name.
+A player ID is written as `player list` shows it next to the name, e.g.
+`76561198000000000` or `Steam_76561198000000000`.
 
 ## For both games
 Every command prints short lines and returns 0 or 1. On 1 the last line
