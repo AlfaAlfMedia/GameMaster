@@ -154,6 +154,87 @@ class LogTest(Base):
         self.assertEqual(valheim.read_current_run(path.with_name("none.log")), [])
 
 
+class RulesTest(Base):
+    def setUp(self) -> None:
+        super().setUp()
+        patch = mock.patch.object(
+            valheim, "WORLD_TEMPLATE", TEMPLATES / "template_world.conf"
+        )
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def test_create_from_nothing(self) -> None:
+        # A server that has never started: not even ~/.config is there
+        path = valheim.create_rules(self.server, "Nordmark")
+        self.assertEqual(path, self.data_dir / "gamemaster" / "Nordmark.conf")
+        self.assertIn("VH_PRESET=", path.read_text())
+        self.assertEqual(mode(path), 0o660)
+        self.assertEqual(mode(self.data_dir / "gamemaster"), 0o2770)
+        self.assertEqual(mode(self.data_dir), 0o2750)
+        self.assertEqual(mode(self.home / ".config") & 0o070, 0o010)
+
+    def test_create_twice_is_refused(self) -> None:
+        valheim.create_rules(self.server, "Nordmark")
+        with self.assertRaises(GameMasterError) as caught:
+            valheim.create_rules(self.server, "Nordmark")
+        self.assertIn("created already", str(caught.exception))
+
+    def test_template_gives_only_the_preset(self) -> None:
+        valheim.create_rules(self.server, "Nordmark")
+        self.assertEqual(
+            valheim.rule_options(self.server, "Nordmark"), ["-preset", "normal"]
+        )
+
+    def test_rules_become_options(self) -> None:
+        path = valheim.create_rules(self.server, "Nordmark")
+        text = path.read_text()
+        for old, new in (("VH_PRESET=", "VH_PRESET=hard"),
+                         ("VH_RAIDS=", "VH_RAIDS=none"),
+                         ("VH_NOMAP=0", "VH_NOMAP=1")):
+            text = text.replace(old, new)
+        path.write_text(text)
+        self.assertEqual(
+            valheim.rule_options(self.server, "Nordmark"),
+            ["-preset", "hard", "-modifier", "raids", "none", "-setkey", "nomap"],
+        )
+
+    def test_wrong_values_are_refused(self) -> None:
+        path = valheim.create_rules(self.server, "Nordmark")
+        for old, new in (("VH_PRESET=", "VH_PRESET=brutal"),
+                         ("VH_COMBAT=", "VH_COMBAT=medium"),
+                         ("VH_NOMAP=0", "VH_NOMAP=yes")):
+            path.write_text(path.read_text().replace(old, new))
+            with self.subTest(new=new), self.assertRaises(GameMasterError):
+                valheim.rule_options(self.server, "Nordmark")
+            path.write_text(path.read_text().replace(new, old))
+
+    def test_world_without_rules_keeps_its_own(self) -> None:
+        self.assertEqual(valheim.rule_options(self.server, "Grollhusen"), [])
+
+    def test_rules_reach_the_service(self) -> None:
+        path = valheim.create_rules(self.server, "Nordmark")
+        path.write_text(path.read_text().replace("VH_PRESET=", "VH_PRESET=hard"))
+        settings = valheim.read_service_settings(self.server)
+        unit = valheim.build_unit(self.server, "Nordmark", settings)
+        self.assertIn("-world Nordmark -password ${VH_PASSWORD} -public 1 -preset hard\n", unit)
+
+    def test_created_worlds_until_valheim_makes_them(self) -> None:
+        valheim.create_rules(self.server, "Nordmark")
+        self.assertEqual(valheim.find_created_worlds(self.server), ["Nordmark"])
+        world = self.data_dir / "worlds_local" / "Nordmark"
+        world.mkdir(parents=True)
+        (world / "_main.1.fwl2").write_text("")
+        self.assertEqual(valheim.find_created_worlds(self.server), [])
+
+    def test_link_in_place_of_the_rules_is_refused(self) -> None:
+        target = self.base / "elsewhere.conf"
+        target.write_text("VH_PRESET=hard\n")
+        (self.data_dir / "gamemaster").mkdir(parents=True)
+        (self.data_dir / "gamemaster" / "Nordmark.conf").symlink_to(target)
+        with self.assertRaises(GameMasterError):
+            valheim.rule_options(self.server, "Nordmark")
+
+
 class StateTest(Base):
     def test_server_started_without_gamemaster(self) -> None:
         running = valheim.RunningServer(4242, "Grollhusen")

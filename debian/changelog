@@ -1,3 +1,25 @@
+gamemaster (0.3.0) UNRELEASED; urgency=medium
+
+  * A Valheim world is set up in the same steps as a Zomboid world:
+    'valheim world create NAME' writes the rules of the world, to be
+    edited, 'valheim world init NAME' writes the service, and 'valheim
+    start' starts the server, which makes the world. 'world create' no
+    longer starts the server.
+  * The rules of a Valheim world - preset, combat, death penalty,
+    resources, raids, portals, no build cost, player events, passive
+    mobs, no map - stand in ~/.config/unity3d/IronGate/Valheim/
+    gamemaster/<world>.conf, from the new template template_world.conf,
+    and are handed to the server on every start.
+  * 'valheim world init NAME' takes over a world the server has already,
+    such as one played before GameMaster: it writes the service for it
+    and passes no rules, so the world keeps its own. It refuses while a
+    server runs, and says how to stop one that GameMaster did not start.
+  * A command a program does not know shows the commands there are, then
+    an ERROR line, and returns 1 - the same in gamemaster, zomboid and
+    valheim. It returned 2 before, without an ERROR line.
+
+ -- AlfaAlf <git@alfaalf-media.de>  Thu, 15 Oct 2026 18:00:00 +0200
+
 gamemaster (0.2.0) unstable; urgency=medium
 
   * Valheim: 'gamemaster install valheim' and 'gamemaster add valheim', and

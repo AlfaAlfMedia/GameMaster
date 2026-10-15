@@ -796,7 +796,7 @@ def agent(arguments: argparse.Namespace) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     """Describe the command line: commands, games, options."""
-    parser = argparse.ArgumentParser(
+    parser = context.ArgumentParser(
         prog="gamemaster",
         description="Administration tool for GameMaster.",
     )

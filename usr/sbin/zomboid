@@ -631,7 +631,7 @@ def reload_options(server: zomboid.Server, _arguments: argparse.Namespace) -> No
 
 def build_parser() -> argparse.ArgumentParser:
     """Describe the command line."""
-    parser = argparse.ArgumentParser(
+    parser = context.ArgumentParser(
         prog="zomboid",
         description="Run a Project Zomboid server.",
     )

@@ -22,10 +22,14 @@ the server, or about how players get on.
 ## Worlds
 - A world is a directory in `worlds_local/` with the save files in it.
   They are binary; never edit them as text.
-- A world is created by the server when it starts with a name it does not
-  know yet. That is what `world create` does.
-- The world modifiers (combat, resources, raids, portals and so on) are set
-  in the game or by the administrator, not by GameMaster.
+- A world is made by the server when it starts with a name it does not
+  know yet. `world create` writes its rules, `world init` sets it up, and
+  the next `start` makes it.
+- The rules of a world (difficulty, combat, resources, raids, portals, no
+  map and so on) stand in `gamemaster/<world>.conf` and are handed to the
+  server on every start; a change applies from the next start. A world
+  without that file, for example one taken over from before GameMaster,
+  keeps the rules it was made with.
 
 ## Network and addresses
 - The server uses its port and the one after it, both udp. The default is

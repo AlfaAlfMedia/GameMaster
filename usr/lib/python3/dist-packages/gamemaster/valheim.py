@@ -178,6 +178,154 @@ def find_worlds(data_dir: Path) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# The rules of a world
+# ---------------------------------------------------------------------------
+
+# Valheim takes the rules of a world - its world modifiers - only on its
+# command line. 'valheim world create' writes them into a file of
+# GameMaster's beside the data of the game, where they can be changed like
+# the settings of a Zomboid world; GameMaster hands them to the server
+# whenever it writes the service.
+RULES_SUBDIR = "gamemaster"
+RULES_SUFFIX = ".conf"
+
+PRESET_KEY = "VH_PRESET"
+PRESETS = ("normal", "casual", "easy", "hard", "hardcore", "immersive", "hammer")
+
+# setting -> (modifier as Valheim names it, the values it takes)
+MODIFIERS = {
+    "VH_COMBAT": ("combat", ("veryeasy", "easy", "hard", "veryhard")),
+    "VH_DEATHPENALTY": ("deathpenalty", ("casual", "veryeasy", "easy", "hard", "hardcore")),
+    "VH_RESOURCES": ("resources", ("muchless", "less", "more", "muchmore", "most")),
+    "VH_RAIDS": ("raids", ("none", "muchless", "less", "more", "muchmore")),
+    "VH_PORTALS": ("portals", ("casual", "hard", "veryhard")),
+}
+
+# setting -> key as Valheim names it
+SWITCHES = {
+    "VH_NOBUILDCOST": "nobuildcost",
+    "VH_PLAYEREVENTS": "playerevents",
+    "VH_PASSIVEMOBS": "passivemobs",
+    "VH_NOMAP": "nomap",
+}
+
+
+def rules_file(server: "Server", worldname: str) -> Path:
+    """Return the file that holds the rules of one world."""
+    return server.data_dir / RULES_SUBDIR / f"{worldname}{RULES_SUFFIX}"
+
+
+def has_rules(server: "Server", worldname: str) -> bool:
+    """Say whether 'valheim world create' wrote rules for this world."""
+    return os.path.lexists(rules_file(server, worldname))
+
+
+def find_created_worlds(server: "Server") -> list[str]:
+    """Return the worlds that have rules but that Valheim has not made yet.
+
+    'valheim world create' writes the rules; the world itself only comes
+    into being when the server first starts with it.
+    """
+    rules_dir = server.data_dir / RULES_SUBDIR
+    if not rules_dir.is_dir():
+        return []
+
+    made = set(find_worlds(server.data_dir))
+    created: list[str] = []
+    for path in sorted(rules_dir.glob(f"*{RULES_SUFFIX}"), key=lambda p: p.stem.lower()):
+        try:
+            name = validate.parse_worldname(path.stem)
+        except GameMasterError:
+            continue
+        if name not in made:
+            created.append(name)
+    return created
+
+
+def rule_options(server: "Server", worldname: str) -> list[str]:
+    """Return the rules of a world as options for the server, checked.
+
+    A world without a file of rules - one the server created before
+    GameMaster took it over - gets no options, so it keeps the rules it
+    has. A world with one always gets a preset, normal if none is set:
+    with a preset, Valheim sets every rule anew on each start, so what the
+    file says is what applies. Without one it would only ever add rules.
+    """
+    if not has_rules(server, worldname):
+        return []
+
+    path = rules_file(server, worldname)
+    # Read as root from a directory the agent may write in, so a link in
+    # place of the file is not followed
+    values = configfile.read_values(permissions.read_text(path))
+
+    def choice(key: str, allowed: tuple[str, ...]) -> str:
+        value = values.get(key, "").strip().lower()
+        if value and value not in allowed:
+            raise GameMasterError(
+                f"{key} in {path} is {value!r}; use one of: {', '.join(allowed)}, "
+                f"or leave it empty."
+            )
+        return value
+
+    options = ["-preset", choice(PRESET_KEY, PRESETS) or "normal"]
+
+    for key, (modifier, allowed) in MODIFIERS.items():
+        value = choice(key, allowed)
+        if value:
+            options += ["-modifier", modifier, value]
+
+    for key, name in SWITCHES.items():
+        value = values.get(key, "0").strip() or "0"
+        if value not in ("0", "1"):
+            raise GameMasterError(f"{key} in {path} must be 0 or 1, not {value!r}.")
+        if value == "1":
+            options += ["-setkey", name]
+
+    return options
+
+
+def create_rules(server: "Server", worldname: str) -> Path:
+    """Write the file of rules of a new world from the template.
+
+    The data directory may not exist yet: the server creates it on its
+    first start, but the rules of the first world come before that. The
+    directories on the way are created as the server would leave them,
+    without following a link.
+    """
+    path = rules_file(server, worldname)
+    content = context.read_template(WORLD_TEMPLATE)
+    owner = owner_of(server)
+    names = (*DATA_SUBDIR.parts, RULES_SUBDIR)
+    data_depth = len(DATA_SUBDIR.parts)
+
+    def directory_mode(below_home: tuple[str, ...]) -> int:
+        # The directories above the data directory may only be passed by
+        # the group; the data directory and below follow its policy
+        if len(below_home) < data_depth:
+            return 0o710
+        return data_modes(below_home[data_depth:]).directory
+
+    home_fd = permissions.open_directory(server.data_dir.parents[data_depth - 1])
+    with permissions.opened(home_fd):
+        rules_fd = permissions.make_directories(home_fd, names, owner, directory_mode)
+        with permissions.opened(rules_fd):
+            try:
+                permissions.create_file(
+                    rules_fd, path.name, content, owner,
+                    data_modes((RULES_SUBDIR, path.name)).file,
+                )
+            except permissions.PermissionsError:
+                if has_rules(server, worldname):
+                    raise GameMasterError(
+                        f"The world '{worldname}' has been created already: {path}"
+                    ) from None
+                raise
+
+    return path
+
+
+# ---------------------------------------------------------------------------
 # A running server
 # ---------------------------------------------------------------------------
 
@@ -374,12 +522,23 @@ def server_state(server: Server) -> tuple[str, RunningServer | None, list[str]]:
 def require_stopped(server: Server, action: str) -> None:
     """Raise if a server is running, naming what would have been done."""
     running = find_running_server(server.server_user)
-    if running is not None:
-        raise GameMasterError(
-            f"The server of user '{server.server_user}' is running with world "
-            f"'{running.worldname}' (process {running.pid}). "
-            f"Stop it before you {action}."
+    if running is None:
+        return
+
+    if service.is_active(unit_name(server.username)):
+        how = f"Stop it with 'valheim -u {server.username} stop'"
+    else:
+        # Started by hand or by a service of its own, which would start it
+        # again if GameMaster stopped it
+        how = (
+            "It was not started by GameMaster. Stop it the way it was started, "
+            "for example with its own service, and disable that service"
         )
+    raise GameMasterError(
+        f"The server of user '{server.server_user}' is running with world "
+        f"'{running.worldname}' (process {running.pid}). {how} before you "
+        f"{action}."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -495,11 +654,13 @@ def remove_from_list(server: Server, name: str, player_id: str) -> bool:
 #   worlds_local/   the worlds                     the agent may change them,
 #                                                  e.g. to put a backup back
 #   the lists       admins, banned, permitted      the agent may change them
+#   gamemaster/     the rules of the worlds,       the agent may change them
+#                   written by GameMaster
 #   the rest        what the server keeps for      the agent may read it
 #                   itself
 #
 # Anything new that a later version of the game adds falls under "the rest".
-GROUP_WRITABLE_NAMES = (WORLDS_SUBDIR, *LISTS.values())
+GROUP_WRITABLE_NAMES = (WORLDS_SUBDIR, *LISTS.values(), RULES_SUBDIR)
 
 
 def data_modes(names: tuple[str, ...]) -> permissions.Modes:
@@ -551,6 +712,7 @@ def fix_permissions(server: Server) -> permissions.Report | None:
 
 SHARE_DIR = Path("/usr/share/gamemaster/valheim")
 SERVICE_TEMPLATE = SHARE_DIR / "template.service"
+WORLD_TEMPLATE = SHARE_DIR / "template_world.conf"
 
 # One service per user, because the worlds of a user share one data
 # directory and the server can load only one of them at a time
@@ -672,6 +834,9 @@ def build_unit(server: Server, worldname: str, settings: Settings) -> str:
     options = list(settings.options)
     if settings.crossplay:
         options.append("-crossplay")
+    # The rules of the world come last: the preset among them first, then
+    # what changes it
+    options += rule_options(server, worldname)
 
     content = context.read_template(SERVICE_TEMPLATE)
     for marker, value in (

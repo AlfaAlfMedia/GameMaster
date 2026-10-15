@@ -19,9 +19,9 @@ and the server loads one of them at a time.
     valheim fix-permissions           give the files back to the server user
     valheim service                   write the service again from the settings
 
-    valheim world list                worlds of this server
-    valheim world create NAME         let the server create a new world and
-                                      load it
+    valheim world list                worlds of this server and their state
+    valheim world create NAME         write the rules of a new world
+    valheim world init NAME           set a world up for the service
     valheim world switch NAME         let the service load another world
 
     valheim player list               players that are connected
@@ -29,6 +29,17 @@ and the server loads one of them at a time.
     valheim player ban ID | unban ID
     valheim player admin ID | unadmin ID
     valheim player permit ID | unpermit ID
+
+A world is set up in three steps, as for Project Zomboid, and the middle
+one is yours:
+
+    1. valheim world create NAME      the rules of the world, from the template
+    2. edit the rules                 difficulty, raids, resources, no map ...
+    3. valheim world init NAME        the service is written for the world;
+                                      Valheim makes it on the first start
+
+A world the server has already - one that was played before GameMaster
+took the server over - is set up with 'valheim world init NAME' alone.
 
 Valheim has no remote console. What the server is doing is read from its
 log, and players are banned or made admins through its three list files,
@@ -148,7 +159,7 @@ def require_unit(server: valheim.Server) -> str:
     if not service.exists(name):
         raise GameMasterError(
             f"There is no service for user '{server.username}' yet. "
-            f"Create a world first: valheim world create WORLDNAME."
+            f"Initialise a world first: valheim world init WORLDNAME."
         )
     return name
 
@@ -309,17 +320,25 @@ def service_command(server: valheim.Server, _arguments: argparse.Namespace) -> N
 
 def list_worlds_command(server: valheim.Server, _arguments: argparse.Namespace) -> None:
     """List the worlds of this server and say which one is running."""
-    worlds = valheim.find_worlds(server.data_dir)
+    playable = valheim.find_worlds(server.data_dir)
+    created = valheim.find_created_worlds(server)
     running = valheim.find_running_server(server.server_user)
     loaded = running.worldname if running else None
 
-    if not worlds:
+    if not playable and not created:
         context.report("no worlds")
         return
 
-    context.report("worlds:")
-    for name in worlds:
-        context.report(f"  {name}{' (running)' if name == loaded else ''}")
+    if playable:
+        context.report("playable:")
+        for name in playable:
+            context.report(f"  {name}{' (running)' if name == loaded else ''}")
+
+    if created:
+        # Valheim makes a world when it first starts with it
+        context.report("created, not started yet:")
+        for name in created:
+            context.report(f"  {name}")
 
 
 def load_world(server: valheim.Server, worldname: str) -> None:
@@ -340,28 +359,57 @@ def load_world(server: valheim.Server, worldname: str) -> None:
 
 
 def create_world_command(server: valheim.Server, arguments: argparse.Namespace) -> None:
-    """Let the server create a new world on its next start, and start it."""
+    """Write the rules of a new world, to be edited before it is set up."""
     worldname = validate.parse_worldname(arguments.name)
 
     if worldname in valheim.find_worlds(server.data_dir):
         raise GameMasterError(
-            f"The world '{worldname}' already exists. Load it with: "
-            f"valheim -u {server.username} world switch {worldname}"
+            f"The world '{worldname}' already exists. Set it up for the service "
+            f"with: valheim -u {server.username} world init {worldname}"
         )
 
-    context.report(f"the server creates world '{worldname}' as it starts")
-    load_world(server, worldname)
+    path = valheim.create_rules(server, worldname)
 
-    # On its very first start the server has just created its data
-    # directory, readable for its group; from now on it is sorted like the
-    # rest
-    fix_permissions_command(server, arguments)
+    context.report(f"created world '{worldname}' for user '{server.username}'")
+    context.report(f"rules: {path}")
+    context.report("edit the rules, then run: "
+                   f"valheim -u {server.username} world init {worldname}")
 
-    if worldname not in valheim.find_worlds(server.data_dir):
-        context.report(
-            f"note: the server is up, but the files of '{worldname}' are not "
-            "there yet; they are written when the server saves"
+
+def init_world_command(server: valheim.Server, arguments: argparse.Namespace) -> None:
+    """Set a world up for the service, so that 'valheim start' loads it.
+
+    A world created with 'valheim world create' is set up with its rules,
+    and Valheim makes it when the server first starts. A world the server
+    has already, for example one that was played before GameMaster took the
+    server over, is set up as it is.
+    """
+    worldname = validate.parse_worldname(arguments.name)
+
+    valheim.require_stopped(server, "initialise a world")
+
+    exists = worldname in valheim.find_worlds(server.data_dir)
+    if not exists and not valheim.has_rules(server, worldname):
+        raise GameMasterError(
+            f"There is no world '{worldname}'. Create it first: "
+            f"valheim -u {server.username} world create {worldname}"
         )
+
+    if exists:
+        context.report(f"world '{worldname}' is already initialised")
+
+    # Checks the settings of the server, its commands and the rules of the
+    # world before anything is written
+    path = valheim.install_unit(server, worldname)
+    service.enable(valheim.unit_name(server.username))
+    context.report(f"service written: {path}")
+
+    if not exists:
+        context.report(f"Valheim makes world '{worldname}' when the server starts")
+    context.report(
+        f"world '{worldname}' is ready. Start it with: "
+        f"valheim -u {server.username} start"
+    )
 
 
 def switch_world_command(server: valheim.Server, arguments: argparse.Namespace) -> None:
@@ -369,6 +417,12 @@ def switch_world_command(server: valheim.Server, arguments: argparse.Namespace) 
     worldname = validate.parse_worldname(arguments.name)
 
     if worldname not in valheim.find_worlds(server.data_dir):
+        if valheim.has_rules(server, worldname):
+            raise GameMasterError(
+                f"The world '{worldname}' has not been started yet. Set it up "
+                f"with 'valheim world init {worldname}', then start it with "
+                f"'valheim start'."
+            )
         raise GameMasterError(
             f"There is no world '{worldname}'. Run 'valheim world list', or "
             f"create it with 'valheim world create {worldname}'."
@@ -456,7 +510,7 @@ def change_list(name: str, add: bool):
 
 def build_parser() -> argparse.ArgumentParser:
     """Describe the command line."""
-    parser = argparse.ArgumentParser(
+    parser = context.ArgumentParser(
         prog="valheim",
         description="Run a Valheim server.",
     )
@@ -503,9 +557,13 @@ def add_world_commands(commands) -> None:
     actions.add_parser("list", help="the worlds of this server").set_defaults(
         action=list_worlds_command)
 
-    create = actions.add_parser("create", help="create a new world and load it")
+    create = actions.add_parser("create", help="write the rules of a new world")
     create.add_argument("name", metavar="NAME", help="name of the new world")
     create.set_defaults(action=create_world_command)
+
+    init = actions.add_parser("init", help="set a world up for the service")
+    init.add_argument("name", metavar="NAME", help="name of the world")
+    init.set_defaults(action=init_world_command)
 
     switch = actions.add_parser("switch", help="let the service load another world")
     switch.add_argument("name", metavar="NAME", help="name of the world")

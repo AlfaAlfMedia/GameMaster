@@ -1,5 +1,5 @@
 # The systemd service of the Valheim server of user @CONF_USER@.
-# Written by GameMaster ('valheim world create', 'valheim world switch',
+# Written by GameMaster ('valheim world init', 'valheim world switch',
 # 'valheim service'), which replace it every time - do not edit it by hand.
 # Settings and commands of your own go into
 # /etc/gamemaster/valheim/@CONF_USER@.conf.

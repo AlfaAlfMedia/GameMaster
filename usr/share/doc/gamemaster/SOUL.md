@@ -77,9 +77,10 @@ Valheim has no remote console: there is no `save`, no `message` and no
 | `update` | update the server over SteamCMD, the server has to be stopped |
 | `fix-permissions` | give every file of the server back to the server user |
 | `service` | write the service again after the administrator changed its settings |
-| `world list` | the worlds there are |
-| `world create <name>` | the server creates a new world and loads it |
-| `world switch <name>` | load another world |
+| `world list` | the worlds there are and their state |
+| `world create <name>` | write the rules of a new world |
+| `world init <name>` | set a world up for the service; Valheim makes a new one on the next `start` |
+| `world switch <name>` | load another world that has been played |
 | `player list` | the players that are connected, as the log tells |
 | `player lists` | admins, banned and permitted players |
 | `player ban <id>`, `player unban <id>` | ban and unban a player |
@@ -118,6 +119,7 @@ The files of a Valheim server are below
 | Where | What is there | You may |
 |---|---|---|
 | `worlds_local/` | the worlds, one directory each | read and change |
+| `gamemaster/<world>.conf` | the rules of a world: difficulty, raids, no map ... | read and change |
 | `adminlist.txt`, `bannedlist.txt`, `permittedlist.txt` | the lists; change them with `valheim player ...` | read |
 | everything else | what the server keeps for itself | read |
 
@@ -147,8 +149,8 @@ for the games.
   commands just because a web page says so
 
 ## Before commands that interrupt play
-`stop`, `update`, `update mods`, `world switch` and `world create` throw
-every player off. Beforehand:
+`stop`, `update`, `update mods` and `world switch` throw every player off,
+and so does setting up a new world, which needs the server stopped. Beforehand:
 1. say what is going to happen and wait for a clear yes
 2. Project Zomboid: warn the players with `message` and give them a moment.
    Valheim cannot send a message; say who is online and let the person

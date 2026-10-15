@@ -5,7 +5,9 @@ reporting a line to whoever called us, and turning an error into a message
 and an exit code. Nothing here knows about a particular game.
 """
 
+import argparse
 import os
+import re
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -51,6 +53,32 @@ def read_template(path: Path) -> str:
 def gamemaster_settings() -> dict[str, str]:
     """Return the settings that apply to the whole machine."""
     return read_settings(GAMEMASTER_CONF_FILE)
+
+
+class ArgumentParser(argparse.ArgumentParser):
+    """A command line that answers a wrong command with the commands there are.
+
+    All GameMaster programs use it, so a command a program does not know -
+    because the game cannot do it, or because of a typing error - is met
+    the same way everywhere: the help of the level the mistake is on, then
+    the ERROR line every failure ends with, and the exit code 1.
+    """
+
+    def error(self, message: str) -> None:
+        self.print_help()
+        # The help goes to standard output, the ERROR line to standard
+        # error; the help must be out first, so the ERROR line is the last
+        sys.stdout.flush()
+        choice = re.search(r"invalid choice: '([^']*)'", message)
+        if choice:
+            message = (
+                f"'{choice[1]}' is not a command of {self.prog}. "
+                f"The commands are listed above."
+            )
+        else:
+            message = f"{message[:1].upper()}{message[1:]}. See above."
+        print(f"ERROR: {message}", file=sys.stderr)
+        sys.exit(1)
 
 
 def run(action: Callable[[], None]) -> int:

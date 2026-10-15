@@ -181,7 +181,10 @@ used.
 | `zomboid option reload` | read the ini file again |
 
 Every command reports short lines on standard output and returns 0 or 1. On
-1 the last line begins with `ERROR:` and says what is wrong.
+1 the last line begins with `ERROR:` and says what is wrong. A command a
+program does not know shows the commands there are at that level, then
+that `ERROR:` line; this is the same for `gamemaster`, `zomboid` and
+`valheim`.
 
 ## Valheim
 
@@ -190,10 +193,18 @@ Every command reports short lines on standard output and returns 0 or 1. On
 ```
 sudo gamemaster install valheim -u valheim          # user, install, register
 sudo nano /etc/gamemaster/valheim/valheim.conf      # name and password
-sudo valheim -u valheim world create Midgard        # the server creates the
-                                                    # world and starts
+sudo valheim -u valheim world create Midgard        # the rules of the world
+sudo nano ~valheim/.config/unity3d/IronGate/Valheim/gamemaster/Midgard.conf
+                                                    # difficulty, raids, ...
+sudo valheim -u valheim world init Midgard          # the service is written
+sudo valheim -u valheim start                       # Valheim makes the world
 sudo valheim -u valheim status
 ```
+
+The steps are those of Project Zomboid. A world the server has already -
+one that was played before GameMaster took the server over - is set up
+with `valheim world init NAME` alone; stop the service or script that
+started the server before, and disable it.
 
 ### What is different
 
@@ -208,8 +219,20 @@ anything or tell it anything. Instead:
   and when it gets `SIGINT`, which is how systemd stops it
 - bans and rights are set in the three list files of the server, which it
   reads again when they change
-- a world needs no first start of its own: the server creates a world when
-  it starts with a name it does not know yet
+- a world needs no first start of its own, as a Zomboid world does: the
+  server creates a world when it starts with a name it does not know yet,
+  so `valheim world init` only writes the service, and the world comes into
+  being with the next `valheim start`
+- the rules of a world - the world modifiers of the game - are not kept in
+  a file Valheim reads, but given on its command line. `valheim world
+  create` writes them into a file of GameMaster's,
+  `~/.config/unity3d/IronGate/Valheim/gamemaster/<world>.conf`, from the
+  template `/usr/share/gamemaster/valheim/template_world.conf`, and
+  GameMaster hands them to the server on every start. It always gives a
+  preset, `normal` if none is set: with a preset Valheim sets every rule
+  anew, so what the file says is what applies, and a change applies from
+  the next start. A world without such a file, one taken over, gets no
+  rules from GameMaster and keeps the ones it has
 
 The world, the port and the other settings are given on the command line
 of the server, in the `ExecStart` line of `valheim-<user>.service`. The
@@ -232,9 +255,10 @@ Run as root, by a human or by the agent. Every command takes
 | `valheim update` | update the server with SteamCMD (server must be stopped) |
 | `valheim fix-permissions` | give the files of the server back to its user, with the permissions below |
 | `valheim service` | write the service again from the configuration; applies from the next start |
-| `valheim world list` | the worlds of this server |
-| `valheim world create NAME` | point the service at a new world and start it, which creates the world |
-| `valheim world switch NAME` | let the service load another world |
+| `valheim world list` | the worlds of this server and their state |
+| `valheim world create NAME` | write the rules of a new world, from the template |
+| `valheim world init NAME` | set a world up for the service; a world the server has already is taken over as it is |
+| `valheim world switch NAME` | let the service load another world that has been started before |
 | `valheim player list` | the players that are connected, with their IDs |
 | `valheim player lists` | the admins, the banned and the permitted players |
 | `valheim player ban ID` / `unban ID` | the list of banned players |
@@ -265,6 +289,7 @@ The server keeps its worlds and lists in the default place of the game,
 |---|---|---|---|---|
 | `worlds_local/` | the worlds and the server's backups of them | read, write | `0660` | `2770` |
 | `adminlist.txt`, `bannedlist.txt`, `permittedlist.txt` | the lists | read, write | `0660` | |
+| `gamemaster/` | the rules of the worlds, written by GameMaster | read, write | `0660` | `2770` |
 | everything else | what the server keeps for itself | read | `0640` | `2750` |
 
 The directories on the way there, `~/.config` and below, are opened to the
@@ -548,6 +573,7 @@ usr/
     template.service            template for the systemd service
   share/gamemaster/valheim/
     template.conf               template for a server configuration
+    template_world.conf         template for the rules of a world
     template.service            template for the systemd service
   share/doc/gamemaster/
     SOUL.md                     the profile of the agent, what it may
