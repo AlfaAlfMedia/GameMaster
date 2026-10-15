@@ -154,6 +154,26 @@ class LogTest(Base):
         self.assertEqual(valheim.read_current_run(path.with_name("none.log")), [])
 
 
+class StateTest(Base):
+    def test_server_started_without_gamemaster(self) -> None:
+        running = valheim.RunningServer(4242, "Grollhusen")
+        with mock.patch.object(valheim, "find_running_server", return_value=running):
+            state, found, lines = valheim.server_state(self.server)
+            self.assertEqual((state, found, lines), (valheim.UNMANAGED, running, []))
+
+            path = valheim.log_file(self.server, "Grollhusen")
+            path.parent.mkdir(parents=True)
+            path.write_text("Mono path[0] = 'x'\n")
+            self.assertEqual(valheim.server_state(self.server)[0], valheim.STARTING)
+
+            path.write_text("Mono path[0] = 'x'\nGame server connected\n")
+            self.assertEqual(valheim.server_state(self.server)[0], valheim.RUNNING)
+
+    def test_nothing_running(self) -> None:
+        with mock.patch.object(valheim, "find_running_server", return_value=None):
+            self.assertEqual(valheim.server_state(self.server)[0], valheim.NOT_RUNNING)
+
+
 class ListsTest(Base):
     def setUp(self) -> None:
         super().setUp()

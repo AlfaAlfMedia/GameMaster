@@ -1,4 +1,4 @@
-gamemaster (0.2.0) UNRELEASED; urgency=medium
+gamemaster (0.2.0) unstable; urgency=medium
 
   * Valheim: 'gamemaster install valheim' and 'gamemaster add valheim', and
     the new program 'valheim' to run a server: status, start, stop, update,
@@ -21,7 +21,7 @@ gamemaster (0.2.0) UNRELEASED; urgency=medium
     GameMaster now creates them first and sorts them before every start.
     Zomboid logs that were readable for everyone are now 0640.
 
- -- AlfaAlf <git@alfaalf-media.de>  Thu, 15 Oct 2026 14:00:00 +0200
+ -- AlfaAlf <git@alfaalf-media.de>  Thu, 15 Oct 2026 16:00:00 +0200
 
 gamemaster (0.1.7) unstable; urgency=medium
 

@@ -230,6 +230,11 @@ def show_status(server: valheim.Server, _arguments: argparse.Namespace) -> None:
 
     if state == valheim.RUNNING:
         report_players(valheim.players_from_log(lines))
+    elif state == valheim.UNMANAGED:
+        context.report(
+            f"players: unknown, there is no log of GameMaster's for this server "
+            f"({valheim.log_file(server, running.worldname)})"
+        )
 
 
 def start_command(server: valheim.Server, _arguments: argparse.Namespace) -> None:
@@ -394,6 +399,12 @@ def list_players(server: valheim.Server, _arguments: argparse.Namespace) -> None
     if running is None:
         raise GameMasterError(
             f"No Valheim server is running for user '{server.server_user}'."
+        )
+    if state == valheim.UNMANAGED:
+        raise GameMasterError(
+            f"The server of user '{server.server_user}' was not started by "
+            f"GameMaster, so its log is not known and its players cannot be "
+            f"told."
         )
     if state != valheim.RUNNING:
         raise GameMasterError(

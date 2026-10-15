@@ -190,6 +190,10 @@ SERVER_PROGRAM = "valheim_server.x86_64"
 NOT_RUNNING = "not running"
 STARTING = "starting"
 RUNNING = "running"
+# A server that runs without a log of GameMaster's was started some other
+# way, by hand or by a service of its own. That it runs is known, how far
+# it is and who plays on it is not.
+UNMANAGED = "running, not started by GameMaster"
 
 
 class RunningServer(NamedTuple):
@@ -351,14 +355,19 @@ def players_from_log(lines: list[str]) -> list[Player]:
 def server_state(server: Server) -> tuple[str, RunningServer | None, list[str]]:
     """Return how far along the server of this user is, with its log lines.
 
-    Three answers are possible: it is not running at all, it is on its way
-    up but cannot be joined yet, or it is running.
+    Four answers are possible: it is not running at all, it is on its way
+    up but cannot be joined yet, it is running, or it runs but was started
+    without GameMaster, so its log is not there to tell more.
     """
     running = find_running_server(server.server_user)
     if running is None:
         return NOT_RUNNING, None, []
 
-    lines = read_current_run(log_file(server, running.worldname))
+    path = log_file(server, running.worldname)
+    if not path.is_file():
+        return UNMANAGED, running, []
+
+    lines = read_current_run(path)
     return (RUNNING if is_ready(lines) else STARTING), running, lines
 
 
