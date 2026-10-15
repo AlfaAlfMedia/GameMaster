@@ -206,7 +206,8 @@ class PermissionsTest(Base):
         for name in ("adminlist.txt", "bannedlist.txt", "permittedlist.txt", "prefs"):
             (self.data_dir / name).write_text("")
         # What the server leaves behind with UMask=0007
-        (self.home / ".config").chmod(0o770)
+        for directory in (".config", ".config/unity3d", ".config/unity3d/IronGate"):
+            (self.home / directory).chmod(0o770)
 
         valheim.fix_permissions(self.server)
 
@@ -218,8 +219,7 @@ class PermissionsTest(Base):
         # The group may pass through ~/.config and below, nothing more
         for directory in (".config", ".config/unity3d", ".config/unity3d/IronGate"):
             with self.subTest(directory=directory):
-                self.assertTrue(mode(self.home / directory) & 0o010)
-                self.assertFalse(mode(self.home / directory) & 0o020)
+                self.assertEqual(mode(self.home / directory) & 0o070, 0o010)
 
 
 class ServiceTest(Base):

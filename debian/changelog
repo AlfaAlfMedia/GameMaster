@@ -13,6 +13,13 @@ gamemaster (0.2.0) UNRELEASED; urgency=medium
     dpkg; add the three lines there before installing a Valheim server.
   * SOUL.md covers both games; new skills valheim-world, valheim-players,
     valheim-troubleshoot and valheim-knowledge.
+  * A quote at the end of a setting is kept unless it closes a quote at
+    its start: VH_SERVER_NAME=Halle "Nord" lost its last quote before.
+  * The logs below /var/log/gamemaster belong to root and the group of
+    the server, readable for the group, so the agent can read them.
+    systemd created them for root alone with the service's UMask=0007;
+    GameMaster now creates them first and sorts them before every start.
+    Zomboid logs that were readable for everyone are now 0640.
 
  -- AlfaAlf <git@alfaalf-media.de>  Thu, 15 Oct 2026 14:00:00 +0200
 

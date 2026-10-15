@@ -200,5 +200,24 @@ class CreateTest(unittest.TestCase):
         self.assertFalse(permissions.open_to_group(home))
 
 
+class LogDirectoryTest(unittest.TestCase):
+    def test_logs_are_readable_for_the_group(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp) / "log" / "valheim"
+            directory.mkdir(parents=True)
+            # As systemd leaves it: for its owner alone, with UMask=0007
+            (directory / "old.log").write_text("x")
+            (directory / "old.log").chmod(0o660)
+            (directory / "link.log").symlink_to(directory / "old.log")
+
+            permissions.prepare_log_directory(directory, OWNER, ("new.log",))
+
+            self.assertEqual(stat.S_IMODE(directory.stat().st_mode), 0o750)
+            self.assertEqual(stat.S_IMODE((directory / "old.log").stat().st_mode), 0o640)
+            self.assertEqual(stat.S_IMODE((directory / "new.log").stat().st_mode), 0o640)
+            self.assertEqual((directory / "old.log").read_text(), "x")
+            self.assertTrue((directory / "link.log").is_symlink())
+
+
 if __name__ == "__main__":
     unittest.main()

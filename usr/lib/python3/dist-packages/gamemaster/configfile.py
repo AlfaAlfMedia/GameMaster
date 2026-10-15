@@ -15,8 +15,8 @@ class ConfigFileError(GameMasterError):
 def read_values(text: str) -> dict[str, str]:
     """Return the settings of a configuration file as a dictionary.
 
-    Empty lines and lines starting with '#' are skipped, quotes around a
-    value are dropped, and a later line overrides an earlier one. A value
+    Empty lines and lines starting with '#' are skipped, a pair of quotes
+    around a value is dropped, and a later line overrides an earlier one. A value
     may refer to a setting defined above it as $NAME or ${NAME}.
     """
     values: dict[str, str] = {}
@@ -31,8 +31,7 @@ def read_values(text: str) -> dict[str, str]:
         if not separator:
             continue
 
-        value = value.strip().strip('"').strip("'")
-        values[key.strip()] = _expand(value, values)
+        values[key.strip()] = _expand(_unquoted(value.strip()), values)
 
     return values
 
@@ -70,6 +69,17 @@ def set_value(text: str, key: str, value: str) -> str:
         raise ConfigFileError(f"No line for {key!r} found.")
 
     return "".join(lines)
+
+
+def _unquoted(value: str) -> str:
+    """Return the value without the pair of quotes around it, if it has one.
+
+    Only a matching pair counts: a quote that belongs to the value, as the
+    last one in 'Halle "Nord"', stays where it is.
+    """
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        return value[1:-1]
+    return value
 
 
 def _expand(value: str, values: dict[str, str]) -> str:

@@ -455,7 +455,9 @@ def init_world_command(server: zomboid.Server, arguments: argparse.Namespace) ->
 
 def run_first_start(server: zomboid.Server, worldname: str) -> None:
     """Carry out the one manual start that creates the world."""
-    directory = zomboid.prepare_log_directory(server)
+    # Created beforehand, so it belongs to root and the group of the
+    # server, readable for the agent, and not to root alone
+    directory = zomboid.prepare_log_directory(server, f"{worldname}-initialise.log")
     log_file = directory / f"{worldname}-initialise.log"
 
     try:

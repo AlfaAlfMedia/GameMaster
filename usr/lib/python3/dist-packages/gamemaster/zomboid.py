@@ -2,7 +2,6 @@
 
 import os
 import pwd
-import shutil
 from contextlib import ExitStack
 from pathlib import Path
 from typing import NamedTuple
@@ -476,6 +475,10 @@ def fix_permissions(server: Server) -> permissions.Report | None:
     """
     home = server.data_dir.parent
 
+    # The logs as well: systemd creates them for root alone
+    if log_directory(server).is_dir():
+        prepare_log_directory(server)
+
     # The agent reaches the data directory through the home directory
     permissions.open_to_group(home)
 
@@ -580,17 +583,12 @@ def log_directory(server: Server) -> Path:
     return LOG_DIR / server.username
 
 
-def prepare_log_directory(server: Server) -> Path:
-    """Create the log directory of this server and hand it to its user."""
+def prepare_log_directory(server: Server, *names: str) -> Path:
+    """Create the log directory of this server and let its group read it."""
     directory = log_directory(server)
-    try:
-        directory.mkdir(parents=True, exist_ok=True)
-        shutil.chown(directory, group=server.server_user)
-        directory.chmod(0o750)
-    except (OSError, LookupError) as error:
-        raise GameMasterError(
-            f"Could not prepare {directory}: {error}"
-        ) from error
+    permissions.prepare_log_directory(
+        directory, permissions.Owner(0, owner_of(server).gid), names
+    )
     return directory
 
 
@@ -633,7 +631,7 @@ def build_unit(server: Server, worldname: str) -> str:
 
 def install_unit(server: Server, worldname: str) -> Path:
     """Write the unit file of this server and make systemd read it."""
-    prepare_log_directory(server)
+    prepare_log_directory(server, f"{worldname}.log")
     path = service.write_unit(unit_name(server.username), build_unit(server, worldname))
     service.daemon_reload()
     return path

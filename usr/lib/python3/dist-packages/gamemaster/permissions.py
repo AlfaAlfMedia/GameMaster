@@ -311,7 +311,7 @@ def open_path_to_group(base: Path, names: tuple[str, ...]) -> None:
             base = base / name
 
             mode = stat.S_IMODE(os.fstat(fd).st_mode)
-            wanted = (mode | 0o010) & ~0o020
+            wanted = (mode | 0o010) & ~0o060
             if wanted != mode:
                 try:
                     os.fchmod(fd, wanted)
@@ -321,6 +321,55 @@ def open_path_to_group(base: Path, names: tuple[str, ...]) -> None:
                     ) from error
     finally:
         os.close(fd)
+
+
+# The logs of a server belong to root, which writes them through systemd,
+# and may be read by the group of the server, the agent among it
+LOG_DIRECTORY_MODE = 0o750
+LOG_FILE_MODE = 0o640
+
+
+def prepare_log_directory(
+    directory: Path, owner: Owner, names: tuple[str, ...] = ()
+) -> None:
+    """Create the log directory of a server, and sort the logs in it.
+
+    systemd creates a log file as root, with the group of root and the
+    umask of the service, so the group of the server could not read it.
+    The files named here are created beforehand; every log file in the
+    directory is handed to root and the group, readable for the group.
+    Links and other odd entries are left alone: only root may write in
+    the directory, so they cannot have been put there by the server.
+
+    owner is root and the group of the server.
+    """
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        raise PermissionsError(f"Could not create {directory}: {error}") from error
+
+    with opened(open_directory(directory)) as directory_fd:
+        hand_over(directory_fd, owner, LOG_DIRECTORY_MODE)
+
+        for name in names:
+            try:
+                fd = os.open(
+                    name, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC,
+                    0o600, dir_fd=directory_fd,
+                )
+            except OSError as error:
+                raise PermissionsError(_unusable(directory / name, error)) from error
+            os.close(fd)
+
+        for name in os.listdir(directory_fd):
+            try:
+                fd = os.open(name, FILE_FLAGS, dir_fd=directory_fd)
+            except OSError:
+                continue
+            with opened(fd):
+                status = os.fstat(fd)
+                if stat.S_ISREG(status.st_mode) and status.st_nlink == 1:
+                    hand_over(fd, owner, LOG_FILE_MODE)
 
 
 def file_mode(modes: Modes, current: int) -> int:

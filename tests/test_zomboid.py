@@ -54,6 +54,7 @@ class DataDirectoryTest(unittest.TestCase):
 
         for patch in (
             mock.patch.object(zomboid, "owner_of", return_value=OWNER),
+            mock.patch.object(zomboid, "LOG_DIR", base / "log"),
             mock.patch.object(zomboid, "INI_TEMPLATE", TEMPLATES / "template.ini"),
             mock.patch.object(
                 zomboid, "SANDBOX_TEMPLATE", TEMPLATES / "template_SandboxVars.lua"
